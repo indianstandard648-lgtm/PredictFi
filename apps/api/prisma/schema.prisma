@@ -1,0 +1,215 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── User ─────────────────────────────────────────────────────────────────────
+
+model User {
+  id            String   @id @default(cuid())
+  walletAddress String   @unique
+  username      String?  @unique
+  avatarUrl     String?
+  bio           String?
+  twitterHandle String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  markets     Market[]
+  positions   Position[]
+  resolutions Resolution[]
+  reputation  Reputation?
+
+  @@index([walletAddress])
+  @@map("users")
+}
+
+// ─── Market ───────────────────────────────────────────────────────────────────
+
+enum MarketStatus {
+  OPEN
+  LOCKED
+  RESOLVED
+  CANCELLED
+}
+
+enum MarketCategory {
+  CRYPTO
+  POLITICS
+  SPORTS
+  FINANCE
+  TECH
+  SCIENCE
+  ENTERTAINMENT
+  WORLD_EVENTS
+  OTHER
+}
+
+model Market {
+  id             String         @id @default(cuid())
+  contractId     String?        @unique
+  onchainId      Int?           @unique
+  title          String
+  description    String         @db.Text
+  category       MarketCategory @default(OTHER)
+  status         MarketStatus   @default(OPEN)
+  creatorId      String
+  creator        User           @relation(fields: [creatorId], references: [id])
+  oracleSource   String         @default("admin")
+  oracleAddress  String?
+  endDate        DateTime
+  resolutionDate DateTime
+  totalVolume    Decimal        @default(0) @db.Decimal(20, 7)
+  yesPool        Decimal        @default(0) @db.Decimal(20, 7)
+  noPool         Decimal        @default(0) @db.Decimal(20, 7)
+  yesShares      Decimal        @default(0) @db.Decimal(20, 7)
+  noShares       Decimal        @default(0) @db.Decimal(20, 7)
+  imageUrl       String?
+  tags           String[]
+  featured       Boolean        @default(false)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  positions   Position[]
+  resolution  Resolution?
+  priceHistory PriceSnapshot[]
+
+  @@index([status])
+  @@index([category])
+  @@index([endDate])
+  @@index([createdAt])
+  @@index([featured])
+  @@map("markets")
+}
+
+// ─── Position ─────────────────────────────────────────────────────────────────
+
+enum PositionSide {
+  YES
+  NO
+}
+
+enum PositionStatus {
+  ACTIVE
+  SETTLED
+  CLAIMED
+  REFUNDED
+}
+
+model Position {
+  id               String         @id @default(cuid())
+  userId           String
+  user             User           @relation(fields: [userId], references: [id])
+  marketId         String
+  market           Market         @relation(fields: [marketId], references: [id])
+  side             PositionSide
+  status           PositionStatus @default(ACTIVE)
+  amountUsdc       Decimal        @db.Decimal(20, 7)
+  sharesOwned      Decimal        @db.Decimal(20, 7)
+  entryProbability Decimal        @db.Decimal(5, 2)
+  payout           Decimal?       @db.Decimal(20, 7)
+  profit           Decimal?       @db.Decimal(20, 7)
+  txHash           String?
+  claimTxHash      String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@index([userId])
+  @@index([marketId])
+  @@index([status])
+  @@unique([userId, marketId, side])
+  @@map("positions")
+}
+
+// ─── Resolution ───────────────────────────────────────────────────────────────
+
+enum ResolutionOutcome {
+  YES
+  NO
+  CANCELLED
+}
+
+model Resolution {
+  id          String            @id @default(cuid())
+  marketId    String            @unique
+  market      Market            @relation(fields: [marketId], references: [id])
+  outcome     ResolutionOutcome
+  resolverId  String
+  resolver    User              @relation(fields: [resolverId], references: [id])
+  evidenceUrl String?
+  notes       String?           @db.Text
+  txHash      String?
+  resolvedAt  DateTime          @default(now())
+
+  @@index([marketId])
+  @@map("resolutions")
+}
+
+// ─── Reputation ───────────────────────────────────────────────────────────────
+
+model Reputation {
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+  user                User     @relation(fields: [userId], references: [id])
+  totalPredictions    Int      @default(0)
+  correctPredictions  Int      @default(0)
+  totalVolume         Decimal  @default(0) @db.Decimal(20, 7)
+  totalProfit         Decimal  @default(0) @db.Decimal(20, 7)
+  winRate             Decimal  @default(0) @db.Decimal(5, 2)
+  accuracy            Decimal  @default(0) @db.Decimal(5, 2)
+  reputationScore     Decimal  @default(0) @db.Decimal(8, 2)
+  streak              Int      @default(0)
+  bestStreak          Int      @default(0)
+  rank                Int?
+  updatedAt           DateTime @updatedAt
+
+  @@index([reputationScore(sort: Desc)])
+  @@index([rank])
+  @@map("reputations")
+}
+
+// ─── Price Snapshot ───────────────────────────────────────────────────────────
+
+model PriceSnapshot {
+  id           String   @id @default(cuid())
+  marketId     String
+  market       Market   @relation(fields: [marketId], references: [id])
+  probabilityYes Decimal @db.Decimal(5, 2)
+  probabilityNo  Decimal @db.Decimal(5, 2)
+  yesPool      Decimal  @db.Decimal(20, 7)
+  noPool       Decimal  @db.Decimal(20, 7)
+  volume       Decimal  @db.Decimal(20, 7)
+  recordedAt   DateTime @default(now())
+
+  @@index([marketId, recordedAt])
+  @@map("price_snapshots")
+}
+
+// ─── Oracle Request ───────────────────────────────────────────────────────────
+
+enum OracleStatus {
+  PENDING
+  SUBMITTED
+  VERIFIED
+  DISPUTED
+}
+
+model OracleRequest {
+  id          String       @id @default(cuid())
+  marketId    String
+  source      String       // "admin", "uma", "chainlink", "api3"
+  status      OracleStatus @default(PENDING)
+  requestData String?      @db.Text
+  responseData String?     @db.Text
+  submittedBy String?
+  requestedAt DateTime     @default(now())
+  resolvedAt  DateTime?
+
+  @@index([marketId])
+  @@index([status])
+  @@map("oracle_requests")
+}

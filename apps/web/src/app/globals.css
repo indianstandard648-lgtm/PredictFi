@@ -1,0 +1,124 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 5 5 5;
+    --foreground: 255 255 255;
+    --card: 16 16 16;
+    --primary: 0 212 170;
+    --border: 26 26 26;
+    --muted: 102 102 102;
+    --accent: 42 42 42;
+  }
+
+  * {
+    @apply border-border;
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-white font-sans;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #0a0a0a;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #2a2a2a;
+    border-radius: 2px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #3a3a3a;
+  }
+}
+
+@layer components {
+  .glass {
+    @apply bg-card/80 backdrop-blur-xl border border-border/50;
+  }
+
+  .card-base {
+    @apply bg-card rounded-xl border border-border shadow-card;
+  }
+
+  .card-hover {
+    @apply card-base transition-all duration-200 hover:shadow-card-hover hover:border-primary/20;
+  }
+
+  .btn-primary {
+    @apply bg-primary text-background font-semibold px-6 py-2.5 rounded-lg
+           hover:bg-primary-400 transition-all duration-200 active:scale-95
+           disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+
+  .btn-outline {
+    @apply border border-border text-white font-medium px-6 py-2.5 rounded-lg
+           hover:border-primary/50 hover:text-primary transition-all duration-200
+           active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+
+  .btn-yes {
+    @apply bg-primary/10 border border-primary/30 text-primary font-semibold px-6 py-3 rounded-lg
+           hover:bg-primary hover:text-background transition-all duration-200 active:scale-95;
+  }
+
+  .btn-no {
+    @apply bg-no/10 border border-no/30 text-no font-semibold px-6 py-3 rounded-lg
+           hover:bg-no hover:text-white transition-all duration-200 active:scale-95;
+  }
+
+  .stat-card {
+    @apply card-base p-5 flex flex-col gap-1;
+  }
+
+  .probability-bar {
+    @apply relative h-2 rounded-full overflow-hidden bg-accent;
+  }
+
+  .input-base {
+    @apply bg-accent border border-border rounded-lg px-4 py-2.5 text-white
+           placeholder:text-muted focus:outline-none focus:border-primary/50
+           transition-colors w-full;
+  }
+
+  .tag {
+    @apply text-xs font-medium px-2.5 py-1 rounded-full;
+  }
+
+  .mono {
+    @apply font-mono text-sm;
+  }
+
+  .gradient-text {
+    @apply bg-gradient-primary bg-clip-text text-transparent;
+  }
+}
+
+/* Chart overrides */
+.recharts-cartesian-grid-horizontal line,
+.recharts-cartesian-grid-vertical line {
+  stroke: #1a1a1a;
+}
+
+.recharts-tooltip-wrapper .recharts-default-tooltip {
+  background: #101010 !important;
+  border: 1px solid #2a2a2a !important;
+  border-radius: 8px !important;
+}
