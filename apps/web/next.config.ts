@@ -11,6 +11,20 @@ const nextConfig: NextConfig = {
   experimental: {
     turbo: {},
   },
+  webpack(config, { isServer }) {
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        net: false,
+        tls: false,
+        crypto: false,
+      };
+      // sodium-native is a Node.js native addon — stub it in the browser bundle
+      config.externals = [...(config.externals ?? []), 'sodium-native'];
+    }
+    return config;
+  },
 };
 
 export default nextConfig;

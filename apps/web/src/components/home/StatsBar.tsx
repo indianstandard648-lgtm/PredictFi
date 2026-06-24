@@ -10,11 +10,11 @@ interface Props {
 
 export function StatsBar({ stats }: Props) {
   const items = [
-    { label: 'Total Markets', value: stats.totalMarkets.toLocaleString() },
-    { label: 'Open Markets', value: stats.openMarkets.toLocaleString() },
-    { label: 'Volume Traded', value: formatUSDC(stats.totalVolume) },
-    { label: 'Predictors', value: stats.totalUsers.toLocaleString() },
-    { label: 'Total Positions', value: stats.totalPositions.toLocaleString() },
+    { label: 'Total Markets', value: (stats.totalMarkets ?? 0).toLocaleString() },
+    { label: 'Open Markets', value: (stats.openMarkets ?? 0).toLocaleString() },
+    { label: 'Volume Traded', value: formatUSDC(stats.totalVolume ?? 0) },
+    { label: 'Predictors', value: (stats.totalUsers ?? 0).toLocaleString() },
+    { label: 'Total Positions', value: (stats.totalPositions ?? 0).toLocaleString() },
   ];
 
   return (

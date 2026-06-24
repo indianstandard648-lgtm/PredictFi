@@ -214,20 +214,26 @@ export class MarketsService {
   async getStats(): Promise<{
     totalMarkets: number;
     openMarkets: number;
+    resolvedMarkets: number;
     totalVolume: Decimal;
+    totalPositions: number;
     totalUsers: number;
   }> {
-    const [total, open, volumeAgg, users] = await Promise.all([
+    const [total, open, resolved, volumeAgg, positions, users] = await Promise.all([
       this.prisma.market.count(),
       this.prisma.market.count({ where: { status: MarketStatus.OPEN } }),
+      this.prisma.market.count({ where: { status: MarketStatus.RESOLVED } }),
       this.prisma.market.aggregate({ _sum: { totalVolume: true } }),
+      this.prisma.position.count(),
       this.prisma.user.count(),
     ]);
 
     return {
       totalMarkets: total,
       openMarkets: open,
+      resolvedMarkets: resolved,
       totalVolume: volumeAgg._sum.totalVolume ?? new Decimal(0),
+      totalPositions: positions,
       totalUsers: users,
     };
   }
