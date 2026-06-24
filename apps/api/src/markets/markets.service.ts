@@ -67,11 +67,11 @@ export class MarketsService {
       category,
       search,
       featured,
-      page = 1,
-      limit = 20,
       sortBy = 'createdAt',
       sortOrder = 'desc',
     } = filters;
+    const page = Number(filters.page ?? 1);
+    const limit = Number(filters.limit ?? 20);
 
     const where: Prisma.MarketWhereInput = {};
     if (status) where.status = status;

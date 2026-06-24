@@ -20,9 +20,12 @@ const nextConfig: NextConfig = {
         tls: false,
         crypto: false,
       };
-      // sodium-native is a Node.js native addon — stub it in the browser bundle
-      config.externals = [...(config.externals ?? []), 'sodium-native'];
     }
+    // sodium-native is a Node.js native addon — alias it to an empty stub for the browser
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      'sodium-native': false,
+    };
     return config;
   },
 };

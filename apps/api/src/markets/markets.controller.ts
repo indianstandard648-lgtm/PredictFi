@@ -1,6 +1,6 @@
 import {
   Controller, Get, Post, Body, Param, Query,
-  Headers, HttpCode, HttpStatus, UseGuards,
+  Headers, HttpCode, HttpStatus, UseGuards, ParseIntPipe,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
@@ -40,7 +40,9 @@ export class MarketsController {
 
   @Get('trending')
   @ApiOperation({ summary: 'Get trending markets by volume' })
-  async getTrending(@Query('limit') limit = 10) {
+  async getTrending(
+    @Query('limit', new ParseIntPipe({ optional: true })) limit = 10,
+  ) {
     return this.marketsService.getTrending(limit);
   }
 
