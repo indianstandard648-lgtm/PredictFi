@@ -74,9 +74,10 @@ model Market {
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
-  positions   Position[]
-  resolution  Resolution?
-  priceHistory PriceSnapshot[]
+  positions      Position[]
+  resolution     Resolution?
+  priceHistory   PriceSnapshot[]
+  oracleRequests OracleRequest[]
 
   @@index([status])
   @@index([category])
@@ -199,15 +200,16 @@ enum OracleStatus {
 }
 
 model OracleRequest {
-  id          String       @id @default(cuid())
-  marketId    String
-  source      String       // "admin", "uma", "chainlink", "api3"
-  status      OracleStatus @default(PENDING)
-  requestData String?      @db.Text
-  responseData String?     @db.Text
-  submittedBy String?
-  requestedAt DateTime     @default(now())
-  resolvedAt  DateTime?
+  id           String       @id @default(cuid())
+  marketId     String
+  market       Market       @relation(fields: [marketId], references: [id])
+  source       String
+  status       OracleStatus @default(PENDING)
+  requestData  String?      @db.Text
+  responseData String?      @db.Text
+  submittedBy  String?
+  requestedAt  DateTime     @default(now())
+  resolvedAt   DateTime?
 
   @@index([marketId])
   @@index([status])

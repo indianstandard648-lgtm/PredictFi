@@ -195,7 +195,7 @@ export class PositionsService {
       (sum, p) => sum.plus(p.profit ?? 0), new Decimal(0),
     );
     const claimed = positions.filter((p) => p.status === PositionStatus.CLAIMED);
-    const wins = claimed.filter((p) => (p.profit ?? 0) > 0).length;
+    const wins = claimed.filter((p) => Number(p.profit ?? 0) > 0).length;
 
     return {
       totalPositions: positions.length,

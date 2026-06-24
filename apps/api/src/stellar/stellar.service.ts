@@ -45,7 +45,7 @@ export class StellarService implements OnModuleInit {
       const result = await this.rpcServer.getTransaction(txHash);
       return {
         success: result.status === SorobanRpc.Api.GetTransactionStatus.SUCCESS,
-        result: result.returnValue ? scValToNative(result.returnValue) : null,
+        result: 'returnValue' in result && result.returnValue ? scValToNative(result.returnValue as xdr.ScVal) : null,
       };
     } catch {
       return { success: false, result: null };
