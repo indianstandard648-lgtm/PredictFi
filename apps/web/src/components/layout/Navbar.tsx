@@ -38,6 +38,7 @@ export function Navbar() {
                 <Link
                   key={href}
                   href={href}
+                  prefetch
                   className={cn(
                     'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200',
                     active
@@ -56,6 +57,7 @@ export function Navbar() {
           <div className="flex items-center gap-3">
             <Link
               href="/create"
+              prefetch
               className="hidden sm:flex items-center gap-2 btn-primary text-sm py-2"
             >
               <Plus className="w-4 h-4" />
