@@ -38,10 +38,10 @@ predictfi/
 | Contract | Contract ID |
 |---|---|
 | `ProtocolRegistry` | `CC2YXV2DHQXUMJOEMOS5KTGS3EFGALTDPLE4T5IARPNTQ5L7LGVNTYLI` |
-| `MarketFactory` | _pending_ |
-| `PositionVault` | _pending_ |
-| `SettlementContract` | _pending_ |
-| `ReputationContract` | _pending_ |
+| `MarketFactory` | `CDI5OD7DJPVMYN23HYHL4MOKT6F5NWXRB4QWJXUUTRDLT3XWOWUUALBO` |
+| `PositionVault` | `CASVZNP3EOXIFQNWKLNU44VINHSZRAQIGF5CW24P6XIPDM7U2R4W6EDZ` |
+| `SettlementContract` | `CBIMDLGZBUH6QBSGM5V5MRIW5US6ZFJOH2XYPCOJY7VEDADXMBZMWXLL` |
+| `ReputationContract` | `CBOW7U34OSOVAZP4QE5AW2AWOR7JZWXHT7H5SIH2ZXGDOSINBMETMXWC` |
 
 > Network: Stellar Testnet · Explorer: [stellar.expert](https://stellar.expert/explorer/testnet/contract/CC2YXV2DHQXUMJOEMOS5KTGS3EFGALTDPLE4T5IARPNTQ5L7LGVNTYLI)
 
@@ -50,11 +50,11 @@ predictfi/
 After all contracts are deployed, call `set_contract` on the Registry once per contract (admin wallet required):
 
 ```
-registry.set_contract(MarketFactory,  <market_factory_id>)
-registry.set_contract(PositionVault,  <position_vault_id>)
-registry.set_contract(Settlement,     <settlement_id>)
-registry.set_contract(Reputation,     <reputation_id>)
-registry.set_contract(Treasury,       <treasury_wallet_address>)
+registry.set_contract(MarketFactory,  CDI5OD7DJPVMYN23HYHL4MOKT6F5NWXRB4QWJXUUTRDLT3XWOWUUALBO)
+registry.set_contract(PositionVault,  CASVZNP3EOXIFQNWKLNU44VINHSZRAQIGF5CW24P6XIPDM7U2R4W6EDZ)
+registry.set_contract(Settlement,     CBIMDLGZBUH6QBSGM5V5MRIW5US6ZFJOH2XYPCOJY7VEDADXMBZMWXLL)
+registry.set_contract(Reputation,     CBOW7U34OSOVAZP4QE5AW2AWOR7JZWXHT7H5SIH2ZXGDOSINBMETMXWC)
+registry.set_contract(Treasury,       GC5OZM7AY73DKZMPWU5BMW3EA6BXCYJIIF6UUQQ44XT4DOJQOXQZU2YF)
 ```
 
 Any contract or off-chain service can then resolve peer addresses via `get_contract` / `get_contract_opt` without hardcoding.

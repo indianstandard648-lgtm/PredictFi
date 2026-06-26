@@ -47,6 +47,22 @@ pub enum Category {
     Custom,
 }
 
+/// Bundled creation params — keeps create_market within Soroban's 10-param limit.
+#[derive(Clone)]
+#[contracttype]
+pub struct CreateMarketParams {
+    pub title: String,
+    pub description: String,
+    pub category: Category,
+    pub oracle: Address,
+    pub oracle_source: String,
+    pub end_date: u64,
+    pub resolution_date: u64,
+    pub min_bet: i128,
+    pub max_bet: i128,        // 0 = no upper limit
+    pub trading_fee_bps: u32, // per-market fee override (0 = use platform default)
+}
+
 /// MarketFactory owns market *definitions* only — no pool or volume state.
 /// All financial state lives in PositionVault.
 #[derive(Clone)]
@@ -113,36 +129,23 @@ impl MarketFactory {
         env.storage().instance().extend_ttl(17280, 17280);
     }
 
-    pub fn create_market(
-        env: Env,
-        creator: Address,
-        title: String,
-        description: String,
-        category: Category,
-        oracle: Address,
-        oracle_source: String,
-        end_date: u64,
-        resolution_date: u64,
-        min_bet: i128,
-        max_bet: i128,
-        trading_fee_bps: u32,
-    ) -> u64 {
+    pub fn create_market(env: Env, creator: Address, params: CreateMarketParams) -> u64 {
         creator.require_auth();
 
         let now = env.ledger().timestamp();
-        if end_date <= now {
+        if params.end_date <= now {
             panic!("end_date must be in the future");
         }
-        if resolution_date < end_date {
+        if params.resolution_date < params.end_date {
             panic!("resolution_date must be >= end_date");
         }
-        if min_bet < 1_000_000 {
+        if params.min_bet < 1_000_000 {
             panic!("min_bet must be at least 1 USDC");
         }
-        if max_bet > 0 && max_bet < min_bet {
+        if params.max_bet > 0 && params.max_bet < params.min_bet {
             panic!("max_bet must be >= min_bet");
         }
-        if trading_fee_bps > 1000 {
+        if params.trading_fee_bps > 1000 {
             panic!("trading_fee_bps cannot exceed 10%");
         }
 
@@ -156,21 +159,21 @@ impl MarketFactory {
         let market = Market {
             id: new_id,
             creator: creator.clone(),
-            title: title.clone(),
-            description,
-            category,
-            oracle,
-            oracle_source,
-            end_date,
-            resolution_date,
+            title: params.title.clone(),
+            description: params.description,
+            category: params.category,
+            oracle: params.oracle,
+            oracle_source: params.oracle_source,
+            end_date: params.end_date,
+            resolution_date: params.resolution_date,
             status: MarketStatus::Open,
             outcome: None,
             resolver: None,
             evidence_url: None,
             created_at: now,
-            min_bet,
-            max_bet,
-            trading_fee_bps,
+            min_bet: params.min_bet,
+            max_bet: params.max_bet,
+            trading_fee_bps: params.trading_fee_bps,
         };
 
         env.storage().persistent().set(&DataKey::Market(new_id), &market);
@@ -192,8 +195,8 @@ impl MarketFactory {
             MarketCreatedEvent {
                 market_id: new_id,
                 creator: market.creator,
-                title,
-                end_date,
+                title: params.title,
+                end_date: params.end_date,
             },
         );
 

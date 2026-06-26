@@ -194,7 +194,7 @@ impl ReputationContract {
 
     /// Maintains a sorted top-LEADERBOARD_SIZE list by FRS score.
     fn update_leaderboard(env: &Env, user: &Address, new_score: u64) {
-        let mut board: Vec<LeaderboardEntry> = env
+        let board: Vec<LeaderboardEntry> = env
             .storage()
             .persistent()
             .get(&DataKey::Leaderboard)
