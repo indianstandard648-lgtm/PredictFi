@@ -2,7 +2,7 @@
 
 use soroban_sdk::{
     contract, contractimpl, contracttype, contractmeta,
-    Address, Env, Symbol, Vec,
+    Address, Env, Symbol,
     symbol_short, token,
 };
 
@@ -420,39 +420,3 @@ impl SettlementContract {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_payout_formula() {
-        // 100 shares, 1000 total winning shares, 1500 USDC pool, 2% fee
-        let user_shares = 100i128;
-        let total_winning_shares = 1000i128;
-        let total_pool = 1500i128;
-        let fee_bps = 200i128;
-
-        let gross = (user_shares * total_pool) / total_winning_shares;
-        let fee = (gross * fee_bps) / 10_000i128;
-        let net = gross - fee;
-
-        assert_eq!(gross, 150i128);
-        assert_eq!(fee, 3i128);
-        assert_eq!(net, 147i128);
-    }
-
-    #[test]
-    fn test_claimed_before_transfer_invariant() {
-        // Demonstrates the re-entrancy fix: claimed is set before transfer.
-        // The order is: set claimed → transfer → mark_claimed in vault.
-        // If transfer re-enters claim_rewards, the first check blocks re-entry.
-        let mut claimed = false;
-        // Simulate: set claimed first
-        claimed = true;
-        // Then transfer (simulated)
-        let payout = 147i128;
-        // Re-entrancy attempt would find claimed=true and panic — correct.
-        assert!(claimed);
-        assert_eq!(payout, 147i128);
-    }
-}

@@ -27,10 +27,37 @@ predictfi/
 
 | Contract | Description |
 |---|---|
+| `ProtocolRegistry` | Central address book — maps canonical IDs to deployed contract addresses |
 | `MarketFactory` | Creates markets, stores metadata, resolves outcomes |
 | `PositionVault` | Accepts USDC, mints YES/NO shares, tracks pools |
 | `SettlementContract` | Calculates payouts, distributes USDC to winners |
 | `ReputationContract` | Tracks FRS score, accuracy, and streak |
+
+### Deployed Contracts (Testnet)
+
+| Contract | Contract ID |
+|---|---|
+| `ProtocolRegistry` | `CC2YXV2DHQXUMJOEMOS5KTGS3EFGALTDPLE4T5IARPNTQ5L7LGVNTYLI` |
+| `MarketFactory` | _pending_ |
+| `PositionVault` | _pending_ |
+| `SettlementContract` | _pending_ |
+| `ReputationContract` | _pending_ |
+
+> Network: Stellar Testnet · Explorer: [stellar.expert](https://stellar.expert/explorer/testnet/contract/CC2YXV2DHQXUMJOEMOS5KTGS3EFGALTDPLE4T5IARPNTQ5L7LGVNTYLI)
+
+### Post-Deployment: Register Contracts in Registry
+
+After all contracts are deployed, call `set_contract` on the Registry once per contract (admin wallet required):
+
+```
+registry.set_contract(MarketFactory,  <market_factory_id>)
+registry.set_contract(PositionVault,  <position_vault_id>)
+registry.set_contract(Settlement,     <settlement_id>)
+registry.set_contract(Reputation,     <reputation_id>)
+registry.set_contract(Treasury,       <treasury_wallet_address>)
+```
+
+Any contract or off-chain service can then resolve peer addresses via `get_contract` / `get_contract_opt` without hardcoding.
 
 ### Market Pricing Formula
 

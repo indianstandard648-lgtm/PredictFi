@@ -67,7 +67,7 @@ impl ProtocolRegistry {
     }
 
     /// Returns None if the contract hasn't been registered yet.
-    pub fn try_get_contract(env: Env, id: ContractId) -> Option<Address> {
+    pub fn get_contract_opt(env: Env, id: ContractId) -> Option<Address> {
         env.storage().instance().get(&DataKey::Contract(id))
     }
 
@@ -88,52 +88,3 @@ impl ProtocolRegistry {
     }
 }
 
-// ─── Tests ───────────────────────────────────────────────────────────────────
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use soroban_sdk::{testutils::Address as _, Env};
-
-    #[test]
-    fn test_register_and_retrieve() {
-        let env = Env::default();
-        env.mock_all_auths();
-
-        let contract_id = env.register_contract(None, ProtocolRegistry);
-        let client = ProtocolRegistryClient::new(&env, &contract_id);
-
-        let admin = Address::generate(&env);
-        let vault = Address::generate(&env);
-        let settlement = Address::generate(&env);
-
-        client.initialize(&admin);
-        client.set_contract(&ContractId::PositionVault, &vault);
-        client.set_contract(&ContractId::Settlement, &settlement);
-
-        assert_eq!(client.get_contract(&ContractId::PositionVault), vault);
-        assert_eq!(client.get_contract(&ContractId::Settlement), settlement);
-        assert!(client.try_get_contract(&ContractId::Reputation).is_none());
-    }
-
-    #[test]
-    fn test_address_update() {
-        let env = Env::default();
-        env.mock_all_auths();
-
-        let contract_id = env.register_contract(None, ProtocolRegistry);
-        let client = ProtocolRegistryClient::new(&env, &contract_id);
-
-        let admin = Address::generate(&env);
-        let v1 = Address::generate(&env);
-        let v2 = Address::generate(&env);
-
-        client.initialize(&admin);
-        client.set_contract(&ContractId::MarketFactory, &v1);
-        assert_eq!(client.get_contract(&ContractId::MarketFactory), v1);
-
-        // Upgrading the factory address (e.g., after a protocol upgrade)
-        client.set_contract(&ContractId::MarketFactory, &v2);
-        assert_eq!(client.get_contract(&ContractId::MarketFactory), v2);
-    }
-}

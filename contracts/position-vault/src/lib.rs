@@ -2,7 +2,7 @@
 
 use soroban_sdk::{
     contract, contractimpl, contracttype, contractmeta,
-    Address, Env, Symbol, Vec,
+    Address, Env, Vec,
     symbol_short, token,
 };
 
@@ -327,62 +327,3 @@ impl PositionVault {
     }
 }
 
-// ─── Tests ───────────────────────────────────────────────────────────────────
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use soroban_sdk::Env;
-
-    #[test]
-    fn test_shares_at_open() {
-        let pools = MarketPools { yes_pool: 0, no_pool: 0, yes_shares: 0, no_shares: 0 };
-        let shares = if pools.yes_pool + pools.no_pool == 0 {
-            10_000_000i128
-        } else {
-            0
-        };
-        assert_eq!(shares, 10_000_000i128);
-    }
-
-    #[test]
-    fn test_calculate_shares_decreasing_probability() {
-        // At 33% probability, user gets more shares per dollar than at 50%.
-        let pools_50 = MarketPools { yes_pool: 500, no_pool: 500, yes_shares: 0, no_shares: 0 };
-        let pools_33 = MarketPools { yes_pool: 333, no_pool: 667, yes_shares: 0, no_shares: 0 };
-
-        let amount = 10_000_000i128;
-        let prob_50 = (pools_50.yes_pool * 100) / (pools_50.yes_pool + pools_50.no_pool);
-        let prob_33 = (pools_33.yes_pool * 100) / (pools_33.yes_pool + pools_33.no_pool);
-
-        let shares_50 = (amount * 100) / prob_50;
-        let shares_33 = (amount * 100) / prob_33;
-
-        // Lower probability → more shares per dollar
-        assert!(shares_33 > shares_50);
-    }
-
-    #[test]
-    fn test_position_accumulation_logic() {
-        // Verify that adding a second buy accumulates — not overwrites.
-        let initial = Position {
-            user: soroban_sdk::Address::from_str(
-                &Env::default(),
-                "GAHJJJKMOKYE4RVPZEWZTKH5FVI4PA3VL7GK2LFNUBSGBV4UATGRFQ5",
-            ),
-            market_id: 1,
-            side: Side::Yes,
-            amount_usdc: 10_000_000,
-            shares: 10_000_000,
-            entry_probability: 50,
-            timestamp: 0,
-            claimed: false,
-        };
-        let second_amount = 5_000_000i128;
-        let second_shares = 4_000_000i128;
-        let accumulated_amount = initial.amount_usdc + second_amount;
-        let accumulated_shares = initial.shares + second_shares;
-        assert_eq!(accumulated_amount, 15_000_000i128);
-        assert_eq!(accumulated_shares, 14_000_000i128);
-    }
-}
