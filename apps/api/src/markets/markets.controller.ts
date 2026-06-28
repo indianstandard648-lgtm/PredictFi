@@ -60,13 +60,24 @@ export class MarketsController {
 
   @Post(':id/resolve')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Resolve a market (admin/oracle only)' })
+  @ApiOperation({ summary: 'Resolve a market (oracle/admin) — triggers on-chain settle_market' })
   async resolve(
     @Param('id') id: string,
     @Headers('x-wallet-address') walletAddress: string,
-    @Body() body: { outcome: 'YES' | 'NO'; evidenceUrl?: string },
+    @Body() body: { outcome: 'YES' | 'NO'; evidenceUrl?: string; txHash?: string },
   ) {
-    await this.marketsService.resolve(id, walletAddress, body.outcome, body.evidenceUrl);
-    return { success: true, message: 'Market resolved' };
+    await this.marketsService.resolve(id, walletAddress, body.outcome, body.evidenceUrl, body.txHash);
+    return { success: true, message: 'Market resolved and settlement triggered' };
+  }
+
+  @Post(':id/lock')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Update market status to LOCKED in the database' })
+  async lock(
+    @Param('id') id: string,
+    @Headers('x-wallet-address') walletAddress: string,
+  ) {
+    await this.marketsService.lockMarket(id);
+    return { success: true, message: 'Market locked' };
   }
 }

@@ -100,6 +100,27 @@ export class StellarService implements OnModuleInit {
     throw new Error(`Transaction timeout after ${maxAttempts} attempts: ${txHash}`);
   }
 
+  // ─── High-level contract operations ──────────────────────────────────────
+
+  async settleMarket(onchainId: number, outcome: 'Yes' | 'No'): Promise<void> {
+    if (!this.adminKeypair) {
+      throw new Error('ADMIN_WALLET_SECRET not configured — cannot call settle_market');
+    }
+    const settlementId = this.config.get<string>('SETTLEMENT_CONTRACT_ID');
+    if (!settlementId) throw new Error('SETTLEMENT_CONTRACT_ID not set');
+
+    const adminAddress = this.adminKeypair.publicKey();
+    await this.invokeContract(
+      settlementId,
+      'settle_market',
+      [
+        this.addressToScVal(adminAddress),
+        this.u64ToScVal(BigInt(onchainId)),
+        xdr.ScVal.scvVec([xdr.ScVal.scvSymbol(outcome)]),
+      ],
+    );
+  }
+
   addressToScVal(address: string): xdr.ScVal {
     return new Address(address).toScVal();
   }

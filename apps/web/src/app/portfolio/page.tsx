@@ -1,13 +1,19 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { TrendingUp, TrendingDown, Clock, CheckCircle, XCircle, Wallet } from 'lucide-react';
+import { CheckCircle, Wallet, ExternalLink, TrendingUp, TrendingDown, Loader2 } from 'lucide-react';
 import { fetchUserPositions, fetchPortfolioStats, claimReward } from '@/lib/api';
 import { useWalletStore } from '@/stores/walletStore';
 import { Position } from '@/types';
 import { formatUSDC, formatDate, cn } from '@/lib/utils';
+import {
+  buildClaimRewardsTx,
+  buildRecordLossTx,
+  extractContractError,
+} from '@/lib/contracts';
+import { signTransaction, submitSignedTransaction, waitForTransaction } from '@/lib/stellar';
 import toast from 'react-hot-toast';
 
 interface PortfolioStats {
@@ -26,31 +32,105 @@ export default function PortfolioPage() {
   const [stats, setStats] = useState<PortfolioStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [tab, setTab] = useState<'active' | 'settled'>('active');
+  const [claimingId, setClaimingId] = useState<string | null>(null);
 
-  useEffect(() => {
+  const refresh = useCallback(async () => {
     if (!address) { setIsLoading(false); return; }
-    Promise.all([
-      fetchUserPositions(address),
-      fetchPortfolioStats(address),
-    ]).then(([pos, st]) => {
-      setPositions(pos);
-      setStats(st);
-    }).finally(() => setIsLoading(false));
+    try {
+      const [pos, st] = await Promise.all([
+        fetchUserPositions(address),
+        fetchPortfolioStats(address),
+      ]);
+      setPositions(pos as any);
+      setStats(st as any);
+    } finally {
+      setIsLoading(false);
+    }
   }, [address]);
+
+  useEffect(() => { refresh(); }, [refresh]);
 
   async function handleClaim(position: Position) {
     if (!address) return;
-    try {
-      const result = await claimReward(address, position.id, 'pending-tx');
-      if (result.won) {
-        toast.success(`Claimed ${formatUSDC(result.payout)}!`);
-      } else {
-        toast('Position settled. Better luck next time.', { icon: '📉' });
+    if (claimingId) return; // prevent double-click
+
+    const market = position.market as any;
+    const resolution = market?.resolution;
+    const isWinner = resolution?.outcome === position.side;
+    const onchainId = market?.onchainId as number | undefined;
+
+    if (!onchainId) {
+      // Market not on-chain — just update DB
+      try {
+        const result = await claimReward(address, position.id, 'no-onchain-tx');
+        if (result.won) {
+          toast.success(`Claimed ${formatUSDC(result.payout)}!`);
+        } else {
+          toast('Position settled. Better luck next time.', { icon: '📉' });
+        }
+        await refresh();
+      } catch (e: any) {
+        toast.error(e?.response?.data?.message ?? 'Claim failed');
       }
-      const updated = await fetchUserPositions(address);
-      setPositions(updated);
+      return;
+    }
+
+    setClaimingId(position.id);
+    const loadingToast = toast.loading('Preparing claim transaction...');
+
+    try {
+      let txHash: string;
+
+      if (isWinner) {
+        // ── Winner: claim_rewards on Settlement contract ──────────────────
+        toast.loading('Building claim transaction...', { id: loadingToast });
+        const claimTxXdr = await buildClaimRewardsTx(address, onchainId);
+
+        toast.loading('Waiting for wallet signature...', { id: loadingToast });
+        const signedXdr = await signTransaction(claimTxXdr, address);
+
+        toast.loading('Submitting to Stellar network...', { id: loadingToast });
+        txHash = await submitSignedTransaction(signedXdr);
+
+        toast.loading('Waiting for confirmation...', { id: loadingToast });
+        await waitForTransaction(txHash);
+      } else {
+        // ── Loser: record_loss on Settlement contract (updates reputation) ─
+        toast.loading('Recording loss for reputation...', { id: loadingToast });
+        try {
+          const lossTxXdr = await buildRecordLossTx(address, onchainId);
+          const signedXdr = await signTransaction(lossTxXdr, address);
+          txHash = await submitSignedTransaction(signedXdr);
+          await waitForTransaction(txHash);
+        } catch {
+          // record_loss is optional — don't block settlement
+          txHash = 'loss-recorded-locally';
+        }
+      }
+
+      // Sync with backend
+      toast.loading('Syncing with backend...', { id: loadingToast });
+      const result = await claimReward(address, position.id, txHash);
+
+      if (result.won) {
+        toast.success(
+          `Claimed ${formatUSDC(result.payout)}! Tx: ${txHash.slice(0, 8)}...`,
+          { id: loadingToast, duration: 6000 },
+        );
+      } else {
+        toast('Position settled. Better luck next time.', {
+          id: loadingToast,
+          icon: '📉',
+          duration: 4000,
+        });
+      }
+
+      await refresh();
     } catch (e: any) {
-      toast.error(e?.response?.data?.message ?? 'Claim failed');
+      const msg = extractContractError(e?.message ?? e?.response?.data?.message ?? 'Claim failed');
+      toast.error(msg, { id: loadingToast });
+    } finally {
+      setClaimingId(null);
     }
   }
 
@@ -124,75 +204,144 @@ export default function PortfolioPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {(tab === 'active' ? active : settled).map((position, i) => (
-            <motion.div
-              key={position.id}
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: i * 0.05 }}
-              className="card-base p-5"
-            >
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <Link
-                    href={`/markets/${position.marketId}`}
-                    className="font-medium hover:text-primary transition-colors line-clamp-1"
-                  >
-                    {position.market?.title ?? 'Market'}
-                  </Link>
-                  <div className="flex items-center gap-3 mt-1 text-xs text-muted">
-                    <span className={position.side === 'YES' ? 'text-primary font-medium' : 'text-no font-medium'}>
-                      {position.side}
-                    </span>
-                    <span>•</span>
-                    <span>{formatDate(position.createdAt)}</span>
-                    <span>•</span>
-                    <span>{parseFloat(position.sharesOwned).toFixed(2)} shares</span>
-                  </div>
-                </div>
+          {(tab === 'active' ? active : settled).map((position, i) => {
+            const posMarket = position.market as any;
+            const isSettledWinner =
+              position.status === 'ACTIVE' &&
+              posMarket?.status === 'RESOLVED' &&
+              posMarket?.resolution?.outcome === position.side;
+            const isSettledLoser =
+              position.status === 'ACTIVE' &&
+              posMarket?.status === 'RESOLVED' &&
+              posMarket?.resolution?.outcome !== position.side;
+            const isClaiming = claimingId === position.id;
 
-                <div className="flex items-center gap-6 text-right">
-                  <div>
-                    <p className="text-xs text-muted">Invested</p>
-                    <p className="font-mono font-medium">{formatUSDC(position.amountUsdc)}</p>
-                  </div>
-
-                  {position.status === 'ACTIVE' ? (
-                    <div>
-                      <p className="text-xs text-muted">Entry Prob</p>
-                      <p className="font-mono">{parseFloat(position.entryProbability).toFixed(1)}%</p>
-                    </div>
-                  ) : position.payout ? (
-                    <div>
-                      <p className="text-xs text-muted">Payout</p>
-                      <p className={cn(
-                        'font-mono font-medium',
-                        (position.profit ?? 0) > 0 ? 'text-primary' : 'text-no'
-                      )}>
-                        {formatUSDC(position.payout)}
-                      </p>
-                    </div>
-                  ) : null}
-
-                  {position.status === 'ACTIVE' && position.market?.status === 'RESOLVED' && (
-                    <button
-                      onClick={() => handleClaim(position)}
-                      className="btn-primary text-sm py-2 px-4"
+            return (
+              <motion.div
+                key={position.id}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.05 }}
+                className="card-base p-5"
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <Link
+                      href={`/markets/${position.marketId}`}
+                      className="font-medium hover:text-primary transition-colors line-clamp-1"
                     >
-                      Claim
-                    </button>
-                  )}
-
-                  {position.status === 'CLAIMED' && (
-                    <div className="flex items-center gap-1 text-primary text-xs">
-                      <CheckCircle className="w-3.5 h-3.5" />
-                      Claimed
+                      {posMarket?.title ?? 'Market'}
+                    </Link>
+                    <div className="flex items-center gap-3 mt-1 text-xs text-muted">
+                      <span className={position.side === 'YES' ? 'text-primary font-medium' : 'text-no font-medium'}>
+                        {position.side}
+                      </span>
+                      <span>•</span>
+                      <span>{formatDate(position.createdAt)}</span>
+                      <span>•</span>
+                      <span>{parseFloat(position.sharesOwned).toFixed(2)} shares</span>
+                      {position.txHash && (
+                        <>
+                          <span>•</span>
+                          <a
+                            href={`https://stellar.expert/explorer/testnet/tx/${position.txHash}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 hover:text-primary transition-colors"
+                          >
+                            tx <ExternalLink className="w-2.5 h-2.5" />
+                          </a>
+                        </>
+                      )}
                     </div>
-                  )}
+                  </div>
+
+                  <div className="flex items-center gap-4 text-right">
+                    <div>
+                      <p className="text-xs text-muted">Invested</p>
+                      <p className="font-mono font-medium">{formatUSDC(position.amountUsdc)}</p>
+                    </div>
+
+                    {position.status === 'ACTIVE' && !isSettledWinner && !isSettledLoser && (
+                      <div>
+                        <p className="text-xs text-muted">Entry Prob</p>
+                        <p className="font-mono">{parseFloat(position.entryProbability).toFixed(1)}%</p>
+                      </div>
+                    )}
+
+                    {position.payout && position.status !== 'ACTIVE' && (
+                      <div>
+                        <p className="text-xs text-muted">Payout</p>
+                        <p className={cn(
+                          'font-mono font-medium',
+                          Number(position.profit ?? 0) > 0 ? 'text-primary' : 'text-no',
+                        )}>
+                          {formatUSDC(position.payout)}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Claim button for winners */}
+                    {isSettledWinner && (
+                      <button
+                        onClick={() => handleClaim(position)}
+                        disabled={isClaiming}
+                        className="btn-primary text-sm py-2 px-4 flex items-center gap-2 disabled:opacity-50"
+                      >
+                        {isClaiming ? (
+                          <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Claiming...</>
+                        ) : (
+                          <>
+                            <TrendingUp className="w-3.5 h-3.5" />
+                            Claim Rewards
+                          </>
+                        )}
+                      </button>
+                    )}
+
+                    {/* Settle loss button (updates reputation) */}
+                    {isSettledLoser && (
+                      <button
+                        onClick={() => handleClaim(position)}
+                        disabled={isClaiming}
+                        className="text-sm py-2 px-4 rounded-lg border border-no/30 text-no flex items-center gap-2 hover:bg-no/10 disabled:opacity-50 transition-colors"
+                      >
+                        {isClaiming ? (
+                          <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Recording...</>
+                        ) : (
+                          <>
+                            <TrendingDown className="w-3.5 h-3.5" />
+                            Settle Loss
+                          </>
+                        )}
+                      </button>
+                    )}
+
+                    {position.status === 'CLAIMED' && (
+                      <div className="flex items-center gap-1 text-primary text-xs">
+                        <CheckCircle className="w-3.5 h-3.5" />
+                        Claimed
+                        {position.claimTxHash && (
+                          <a
+                            href={`https://stellar.expert/explorer/testnet/tx/${position.claimTxHash}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="ml-1 opacity-70 hover:opacity-100"
+                          >
+                            <ExternalLink className="w-2.5 h-2.5" />
+                          </a>
+                        )}
+                      </div>
+                    )}
+
+                    {position.status === 'SETTLED' && (
+                      <span className="text-xs text-muted">Settled</span>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </motion.div>
-          ))}
+              </motion.div>
+            );
+          })}
 
           {(tab === 'active' ? active : settled).length === 0 && (
             <div className="text-center py-16 card-base">

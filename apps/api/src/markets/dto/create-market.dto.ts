@@ -1,6 +1,6 @@
 import {
   IsString, IsEnum, IsDateString, IsOptional,
-  MinLength, MaxLength, IsArray,
+  MinLength, MaxLength, IsArray, IsInt, IsPositive,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { MarketCategory } from '@prisma/client';
@@ -45,4 +45,20 @@ export class CreateMarketDto {
   @IsArray()
   @IsString({ each: true })
   tags?: string[];
+
+  @ApiPropertyOptional({ example: 1, description: 'On-chain market ID returned by create_market()' })
+  @IsOptional()
+  @IsInt()
+  @IsPositive()
+  onchainId?: number;
+
+  @ApiPropertyOptional({ example: 'abc123...', description: 'Transaction hash of the create_market() call' })
+  @IsOptional()
+  @IsString()
+  txHash?: string;
+
+  @ApiPropertyOptional({ example: 'GABC123...', description: 'Oracle wallet address set on-chain' })
+  @IsOptional()
+  @IsString()
+  oracleAddress?: string;
 }

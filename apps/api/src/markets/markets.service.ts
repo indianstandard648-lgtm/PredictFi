@@ -1,5 +1,6 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { StellarService } from '../stellar/stellar.service';
 import { CreateMarketDto } from './dto/create-market.dto';
 import { Market, MarketStatus, Prisma } from '@prisma/client';
 import Decimal from 'decimal.js';
@@ -23,7 +24,12 @@ export interface MarketFilters {
 
 @Injectable()
 export class MarketsService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(MarketsService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    private stellar: StellarService,
+  ) {}
 
   async create(walletAddress: string, dto: CreateMarketDto): Promise<Market> {
     const user = await this.prisma.user.upsert({
@@ -49,10 +55,12 @@ export class MarketsService {
         category: dto.category,
         creatorId: user.id,
         oracleSource: dto.oracleSource ?? 'admin',
+        oracleAddress: dto.oracleAddress ?? walletAddress,
         endDate,
         resolutionDate,
         imageUrl: dto.imageUrl,
         tags: dto.tags ?? [],
+        onchainId: dto.onchainId ?? null,
         yesPool: new Decimal(0),
         noPool: new Decimal(0),
         totalVolume: new Decimal(0),
@@ -188,27 +196,57 @@ export class MarketsService {
     resolverWallet: string,
     outcome: 'YES' | 'NO',
     evidenceUrl?: string,
+    txHash?: string,
   ): Promise<void> {
     const market = await this.prisma.market.findUnique({ where: { id: marketId } });
     if (!market) throw new NotFoundException('Market not found');
 
-    const resolver = await this.prisma.user.findUnique({ where: { walletAddress: resolverWallet } });
-    if (!resolver) throw new NotFoundException('Resolver not found');
+    const resolver = await this.prisma.user.upsert({
+      where: { walletAddress: resolverWallet },
+      update: {},
+      create: { walletAddress: resolverWallet },
+    });
 
     await this.prisma.$transaction([
       this.prisma.market.update({
         where: { id: marketId },
         data: { status: MarketStatus.RESOLVED },
       }),
-      this.prisma.resolution.create({
-        data: {
+      this.prisma.resolution.upsert({
+        where: { marketId },
+        update: { outcome: outcome as any, evidenceUrl, txHash },
+        create: {
           marketId,
           outcome: outcome as any,
           resolverId: resolver.id,
           evidenceUrl,
+          txHash,
         },
       }),
     ]);
+
+    // Trigger on-chain settle_market using admin keypair (best-effort)
+    if (market.onchainId) {
+      this.triggerSettlement(market.onchainId, outcome).catch((err) => {
+        this.logger.warn(`settle_market failed for market ${market.onchainId}: ${err?.message}`);
+      });
+    }
+  }
+
+  private async triggerSettlement(onchainId: number, outcome: 'YES' | 'NO'): Promise<void> {
+    const outcomeVariant = outcome === 'YES' ? 'Yes' : 'No';
+    await this.stellar.settleMarket(onchainId, outcomeVariant as 'Yes' | 'No');
+    this.logger.log(`settle_market called for on-chain market #${onchainId} → ${outcomeVariant}`);
+  }
+
+  async lockMarket(marketId: string): Promise<void> {
+    const market = await this.prisma.market.findUnique({ where: { id: marketId } });
+    if (!market) throw new NotFoundException('Market not found');
+    if (market.status !== MarketStatus.OPEN) return; // idempotent
+    await this.prisma.market.update({
+      where: { id: marketId },
+      data: { status: MarketStatus.LOCKED },
+    });
   }
 
   async getStats(): Promise<{

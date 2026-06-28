@@ -1,19 +1,62 @@
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
 import { notFound } from 'next/navigation';
 import { fetchMarket } from '@/lib/api';
 import { MarketChart } from '@/components/market/MarketChart';
 import { TradingPanel } from '@/components/market/TradingPanel';
 import { ProbabilityBar } from '@/components/market/ProbabilityBar';
+import { ResolvePanel } from '@/components/market/ResolvePanel';
 import { categoryColor, formatUSDC, formatDateTime, timeUntil, cn } from '@/lib/utils';
-import { Clock, Users, TrendingUp, CheckCircle, XCircle, Lock, ExternalLink } from 'lucide-react';
+import { Clock, Users, TrendingUp, CheckCircle, XCircle, Lock, ExternalLink, RefreshCw } from 'lucide-react';
+import { Market } from '@/types';
 
 interface Props {
   params: { id: string };
 }
 
-export const revalidate = 10;
+export default function MarketDetailPage({ params }: Props) {
+  const [market, setMarket] = useState<Market | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-export default async function MarketDetailPage({ params }: Props) {
-  const market = await fetchMarket(params.id).catch(() => null);
+  const load = useCallback(async (quiet = false) => {
+    if (!quiet) setIsLoading(true);
+    else setRefreshing(true);
+    try {
+      const m = await fetchMarket(params.id);
+      setMarket(m);
+    } catch {
+      setMarket(null);
+    } finally {
+      setIsLoading(false);
+      setRefreshing(false);
+    }
+  }, [params.id]);
+
+  useEffect(() => { load(); }, [load]);
+
+  // Auto-refresh every 15 seconds for live data
+  useEffect(() => {
+    const interval = setInterval(() => load(true), 15_000);
+    return () => clearInterval(interval);
+  }, [load]);
+
+  if (isLoading) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-6">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="card-base p-6 h-48 animate-pulse" />
+            ))}
+          </div>
+          <div className="card-base p-5 h-64 animate-pulse" />
+        </div>
+      </div>
+    );
+  }
+
   if (!market) return notFound();
 
   const isResolved = market.status === 'RESOLVED';
@@ -35,12 +78,20 @@ export default async function MarketDetailPage({ params }: Props) {
                   'tag',
                   market.status === 'RESOLVED' ? 'bg-muted/10 text-muted' :
                   market.status === 'LOCKED' ? 'bg-warning/10 text-warning' :
-                  'bg-no/10 text-no'
+                  'bg-no/10 text-no',
                 )}>
                   {market.status === 'LOCKED' && <Lock className="w-3 h-3 inline mr-1" />}
                   {market.status}
                 </span>
               )}
+              <button
+                onClick={() => load(true)}
+                disabled={refreshing}
+                className="ml-auto text-muted hover:text-white transition-colors"
+                title="Refresh market data"
+              >
+                <RefreshCw className={cn('w-4 h-4', refreshing && 'animate-spin')} />
+              </button>
             </div>
 
             <h1 className="text-2xl font-bold mb-4">{market.title}</h1>
@@ -93,22 +144,22 @@ export default async function MarketDetailPage({ params }: Props) {
           {isResolved && resolution && (
             <div className={cn(
               'card-base p-6 border-2',
-              resolution.outcome === 'YES' ? 'border-primary/30' : 'border-no/30'
+              resolution.outcome === 'YES' ? 'border-primary/30' : 'border-no/30',
             )}>
               <div className="flex items-center gap-3 mb-3">
-                {resolution.outcome === 'YES' ? (
-                  <CheckCircle className="w-6 h-6 text-primary" />
-                ) : (
-                  <XCircle className="w-6 h-6 text-no" />
-                )}
+                {resolution.outcome === 'YES'
+                  ? <CheckCircle className="w-6 h-6 text-primary" />
+                  : <XCircle className="w-6 h-6 text-no" />
+                }
                 <h3 className="font-bold text-lg">
-                  Resolved: <span className={resolution.outcome === 'YES' ? 'text-primary' : 'text-no'}>
+                  Resolved:{' '}
+                  <span className={resolution.outcome === 'YES' ? 'text-primary' : 'text-no'}>
                     {resolution.outcome}
                   </span>
                 </h3>
               </div>
               <p className="text-sm text-muted">
-                Resolved by {resolution.resolver.username ?? resolution.resolver.walletAddress} on{' '}
+                Resolved by {resolution.resolver?.username ?? resolution.resolver?.walletAddress} on{' '}
                 {formatDateTime(resolution.resolvedAt)}
               </p>
               {resolution.evidenceUrl && (
@@ -131,11 +182,12 @@ export default async function MarketDetailPage({ params }: Props) {
             </h3>
             <div className="space-y-3 text-sm">
               {[
-                ['Created by', market.creator.username ?? market.creator.walletAddress],
+                ['Created by', market.creator?.username ?? market.creator?.walletAddress ?? '—'],
                 ['Oracle', market.oracleSource],
                 ['End Date', formatDateTime(market.endDate)],
                 ['Resolution Date', formatDateTime(market.resolutionDate)],
                 ['Market ID', market.id],
+                ...(market.onchainId ? [['On-Chain ID', `#${market.onchainId}`]] : []),
               ].map(([label, value]) => (
                 <div key={label} className="flex justify-between">
                   <span className="text-muted">{label}</span>
@@ -144,7 +196,7 @@ export default async function MarketDetailPage({ params }: Props) {
               ))}
             </div>
 
-            {market.tags.length > 0 && (
+            {market.tags && market.tags.length > 0 && (
               <div className="mt-4 pt-4 border-t border-border">
                 <p className="text-xs text-muted mb-2">Tags</p>
                 <div className="flex flex-wrap gap-2">
@@ -161,6 +213,7 @@ export default async function MarketDetailPage({ params }: Props) {
         <div className="lg:col-span-1">
           <div className="sticky top-24 space-y-4">
             <TradingPanel market={market} />
+            <ResolvePanel market={market} onResolved={() => load(true)} />
           </div>
         </div>
       </div>

@@ -3,7 +3,8 @@ import {
   Market, Position, Reputation, LeaderboardEntry, PlatformStats, User,
 } from '@/types';
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api/v1';
+const _RAW_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+const BASE_URL = _RAW_URL.endsWith('/api/v1') ? _RAW_URL : `${_RAW_URL}/api/v1`;
 
 function createClient(walletAddress?: string): AxiosInstance {
   return axios.create({
@@ -56,6 +57,9 @@ export async function createMarket(
     oracleSource?: string;
     imageUrl?: string;
     tags?: string[];
+    onchainId?: number;
+    txHash?: string;
+    oracleAddress?: string;
   },
 ): Promise<Market> {
   const { data } = await createClient(walletAddress).post('/markets', payload);
@@ -134,7 +138,11 @@ export async function authUser(walletAddress: string): Promise<User> {
   return data;
 }
 
-export async function fetchProfile(walletAddress: string): Promise<User & { reputation: Reputation }> {
+export async function fetchProfile(walletAddress: string): Promise<User & {
+  reputation: Reputation | null;
+  positions: Array<Position & { market?: Pick<Market, 'id' | 'title' | 'status'> }>;
+  markets?: Array<Pick<Market, 'id' | 'title' | 'status' | 'createdAt'>>;
+}> {
   const { data } = await createClient().get(`/users/${walletAddress}/profile`);
   return data;
 }
@@ -144,6 +152,25 @@ export async function updateProfile(
   payload: { username?: string; bio?: string; twitterHandle?: string; avatarUrl?: string },
 ): Promise<User> {
   const { data } = await createClient(walletAddress).put('/users/me', payload);
+  return data;
+}
+
+// ─── Market Actions ───────────────────────────────────────────────────────────
+
+export async function resolveMarket(
+  walletAddress: string,
+  marketId: string,
+  payload: { outcome: 'YES' | 'NO'; evidenceUrl?: string; txHash?: string },
+): Promise<{ success: boolean; message: string }> {
+  const { data } = await createClient(walletAddress).post(`/markets/${marketId}/resolve`, payload);
+  return data;
+}
+
+export async function lockMarket(
+  walletAddress: string,
+  marketId: string,
+): Promise<{ success: boolean; message: string }> {
+  const { data } = await createClient(walletAddress).post(`/markets/${marketId}/lock`);
   return data;
 }
 

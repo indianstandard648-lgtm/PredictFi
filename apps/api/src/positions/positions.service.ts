@@ -97,7 +97,21 @@ export class PositionsService {
 
     const positions = await this.prisma.position.findMany({
       where,
-      include: { market: { select: { id: true, title: true, status: true, yesPool: true, noPool: true } } },
+      include: {
+        market: {
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            onchainId: true,
+            yesPool: true,
+            noPool: true,
+            resolution: {
+              select: { outcome: true, evidenceUrl: true, resolvedAt: true },
+            },
+          },
+        },
+      },
       orderBy: { createdAt: 'desc' },
     });
 
