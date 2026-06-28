@@ -93,7 +93,7 @@ FRS = (accuracy * 0.4) + (volume_score * 0.2) + (profitability * 0.2) + (consist
 ### 1. Clone & Install
 
 ```bash
-git clone <repo>
+git clone https://github.com/indianstandard648-lgtm/PredictFi.git
 cd predictfi
 cp .env.example .env
 npm install
