@@ -1,6 +1,10 @@
 # PredictFi — Decentralized Prediction Markets on Stellar
 
-A production-grade prediction market protocol built on the Stellar blockchain using Soroban smart contracts. Trade YES/NO shares on real-world events, build your Forecast Reputation Score (FRS), and earn USDC.
+A production-grade prediction market protocol built on the Stellar blockchain using Soroban smart contracts. Trade YES/NO shares on real-world events, build your Forecast Reputation Score (FRS), and earn XLM.
+
+**Live Demo:** [https://web-six-topaz-82.vercel.app](https://web-six-topaz-82.vercel.app)  
+**API:** [https://predictfi-api-production.up.railway.app/api/v1/health](https://predictfi-api-production.up.railway.app/api/v1/health)  
+**API Docs:** [https://predictfi-api-production.up.railway.app/api/docs](https://predictfi-api-production.up.railway.app/api/docs)
 
 ---
 
