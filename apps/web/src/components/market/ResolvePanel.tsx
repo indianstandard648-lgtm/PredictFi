@@ -7,6 +7,8 @@ import { useWalletStore } from '@/stores/walletStore';
 import {
   buildResolveMarketTx,
   extractContractError,
+  readMarketOnChain,
+  readFactoryAdmin,
 } from '@/lib/contracts';
 import { signTransaction, submitSignedTransaction, waitForTransaction } from '@/lib/stellar';
 import { resolveMarket } from '@/lib/api';
@@ -40,9 +42,50 @@ export function ResolvePanel({ market, onResolved }: Props) {
     }
 
     setIsResolving(true);
-    const loadingToast = toast.loading('Preparing resolve transaction...');
+    const loadingToast = toast.loading('Verifying market on-chain....');
 
     try {
+      // Step 0: Verify market exists on-chain and current user is authorized
+      const [onChainMarket, adminAddr] = await Promise.all([
+        readMarketOnChain(market.onchainId, address),
+        readFactoryAdmin(address),
+      ]);
+
+      if (!onChainMarket) {
+        toast.error(
+          'Market not found on-chain — testnet records expire after ~2 days. Create a new market to test resolution.',
+          { id: loadingToast, duration: 8000 },
+        );
+        return;
+      }
+      if (onChainMarket.status === 'Resolved') {
+        toast.error('This market has already been resolved on-chain.', { id: loadingToast });
+        return;
+      }
+      if (onChainMarket.status === 'Cancelled') {
+        toast.error('This market has been cancelled and cannot be resolved.', { id: loadingToast });
+        return;
+      }
+
+      // Admin must be readable — null means instance storage TTL expired
+      if (adminAddr === null) {
+        toast.error(
+          'Market-factory admin record has expired on testnet. Call initialize() on the factory contract again via Stellar playground, then retry.',
+          { id: loadingToast, duration: 12000 },
+        );
+        return;
+      }
+
+      const isOracle = onChainMarket.oracle === address;
+      const isAdmin = adminAddr === address;
+      if (!isOracle && !isAdmin) {
+        toast.error(
+          `Not authorized — you must be the market oracle (${onChainMarket.oracle.slice(0, 8)}…) or the factory admin to resolve.`,
+          { id: loadingToast, duration: 10000 },
+        );
+        return;
+      }
+
       // Step 1: Build resolve_market transaction
       toast.loading('Building resolution transaction...', { id: loadingToast });
       const resolveTxXdr = await buildResolveMarketTx(

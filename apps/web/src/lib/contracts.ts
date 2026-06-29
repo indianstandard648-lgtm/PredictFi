@@ -324,9 +324,25 @@ export function extractContractError(rawError: string): string {
     return SOROBAN_TOKEN_ERRORS[code] ?? `Contract error #${code} — check your XLM balance`;
   }
 
-  // Soroban value/wasm errors
-  if (rawError.includes('Error(Value,') || rawError.includes('Error(WasmVm,')) {
-    return 'Contract execution error — the transaction arguments may be invalid';
+  // WasmVm InvalidAction = panic in the contract (panic=abort hides the message)
+  if (rawError.includes('Error(WasmVm, InvalidAction)')) {
+    // Extract function name from diagnostic event if present
+    const fnMatch = rawError.match(/"VM call trapped: [^"]+",\s*"?(\w+)"?\]/);
+    const fn2Match = rawError.match(/data:\[.*?"(\w+)"\]/);
+    const fnName = fnMatch?.[1] ?? fn2Match?.[1] ?? '';
+    const where = fnName ? ` (in ${fnName})` : '';
+    return `Contract panicked${where} — market not found, already resolved, or you are not the oracle/admin for this market`;
+  }
+
+  // Soroban value errors — type mismatch in arguments
+  if (rawError.includes('Error(Value,')) {
+    const valCode = rawError.match(/Error\(Value,\s*(\w+)\)/)?.[1] ?? 'unknown';
+    return `Invalid argument (${valCode}) — market ID or outcome value is incorrect`;
+  }
+
+  if (rawError.includes('Error(WasmVm,')) {
+    const vmCode = rawError.match(/Error\(WasmVm,\s*(\w+)\)/)?.[1] ?? 'unknown';
+    return `Contract VM error (${vmCode}) — check your transaction arguments`;
   }
 
   if (rawError.includes('HostError')) {
@@ -341,6 +357,48 @@ export function extractContractError(rawError: string): string {
   if (rawError.includes('User rejected') || rawError.includes('rejected')) return 'Transaction rejected by wallet';
   if (rawError.includes('Bad union switch')) return 'Stellar SDK version mismatch — please refresh the page';
   return rawError.length > 120 ? `Transaction failed: ${rawError.slice(0, 120)}...` : rawError;
+}
+
+/** Reads the market from the market-factory to verify it exists and check its oracle address */
+export async function readMarketOnChain(
+  onchainId: number,
+  userAddress: string,
+): Promise<{ oracle: string; status: string } | null> {
+  try {
+    const result = await simulateContractCall(
+      userAddress,
+      getContractId('marketFactory'),
+      'get_market',
+      [nativeToScVal(BigInt(onchainId), { type: 'u64' })],
+    ) as Record<string, unknown> | null;
+    if (!result) return null;
+    // oracle is SCV_ADDRESS → scValToNative returns Address object or string
+    const oracleRaw = result.oracle;
+    const oracle = typeof oracleRaw === 'string'
+      ? oracleRaw
+      : (oracleRaw as { toString?: () => string })?.toString?.() ?? String(oracleRaw);
+    // status is a contracttype enum → returned as ["Open"] or similar array
+    const statusArr = result.status as string[] | string | undefined;
+    const status = Array.isArray(statusArr) ? statusArr[0] : String(statusArr ?? '');
+    return { oracle, status };
+  } catch {
+    return null;
+  }
+}
+
+/** Reads the market-factory admin address */
+export async function readFactoryAdmin(userAddress: string): Promise<string | null> {
+  try {
+    const result = await simulateContractCall(
+      userAddress,
+      getContractId('marketFactory'),
+      'get_admin',
+      [],
+    );
+    return result ? String(result) : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function readXlmBalance(userAddress: string): Promise<number> {
