@@ -21,8 +21,8 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
 COPY apps/api/package*.json ./
 
-# Re-generate Prisma client in runtime image (ensures correct platform binaries)
-RUN npx prisma generate
+# Re-generate Prisma client for the runtime platform, then fix ownership
+RUN npx prisma generate && chown -R predictfi:predictfi /app
 
 USER predictfi
 EXPOSE 4000
