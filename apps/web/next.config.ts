@@ -9,9 +9,7 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: 'unavatar.io' },
     ],
   },
-  experimental: {
-    turbo: {},
-  },
+  turbopack: {},
   webpack(config, { isServer }) {
     if (!isServer) {
       config.resolve.fallback = {
