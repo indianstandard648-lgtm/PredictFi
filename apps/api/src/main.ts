@@ -49,7 +49,7 @@ async function bootstrap() {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
-  const port = config.get<number>('API_PORT', 4000);
+  const port = Number(process.env.PORT) || config.get<number>('API_PORT', 4000);
   await app.listen(port);
   console.log(`\n🚀 PredictFi API running on http://localhost:${port}`);
   console.log(`📖 Swagger docs: http://localhost:${port}/api/docs\n`);
