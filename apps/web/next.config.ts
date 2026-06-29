@@ -1,7 +1,7 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  output: 'standalone',
+  // output: 'standalone',  // enable only for Docker self-hosting, not Vercel
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: '**.githubusercontent.com' },
