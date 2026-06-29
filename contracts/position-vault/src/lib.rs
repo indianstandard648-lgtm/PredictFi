@@ -27,10 +27,10 @@ pub struct Position {
     pub user: Address,
     pub market_id: u64,
     pub side: Side,
-    pub amount_usdc: i128,       // total USDC deposited across all buys
-    pub shares: i128,            // total shares accumulated
-    pub entry_probability: i128, // probability at most recent buy (bps, 0-10000)
-    pub timestamp: u64,          // most recent buy time
+    pub amount: i128,             // total XLM deposited across all buys (in stroops)
+    pub shares: i128,             // total shares accumulated
+    pub entry_probability: i128,  // probability at most recent buy (bps, 0-10000)
+    pub timestamp: u64,           // most recent buy time
     pub claimed: bool,
 }
 
@@ -48,7 +48,7 @@ pub struct MarketPools {
 #[contracttype]
 pub enum DataKey {
     Admin,
-    UsdcToken,
+    Token,
     MarketFactory,
     Settlement,
     Position(u64, Address, Side),
@@ -68,7 +68,7 @@ impl PositionVault {
     pub fn initialize(
         env: Env,
         admin: Address,
-        usdc_token: Address,
+        token: Address,
         market_factory: Address,
         settlement: Address,
     ) {
@@ -76,63 +76,63 @@ impl PositionVault {
             panic!("already initialized");
         }
         env.storage().instance().set(&DataKey::Admin, &admin);
-        env.storage().instance().set(&DataKey::UsdcToken, &usdc_token);
+        env.storage().instance().set(&DataKey::Token, &token);
         env.storage().instance().set(&DataKey::MarketFactory, &market_factory);
         env.storage().instance().set(&DataKey::Settlement, &settlement);
         env.storage().instance().extend_ttl(17280, 17280);
     }
 
-    pub fn buy_yes(env: Env, user: Address, market_id: u64, usdc_amount: i128) -> i128 {
+    pub fn buy_yes(env: Env, user: Address, market_id: u64, amount: i128) -> i128 {
         user.require_auth();
-        Self::validate_amount(usdc_amount);
+        Self::validate_amount(amount);
 
         let pools = Self::get_or_init_pools(&env, market_id);
-        let shares = Self::calculate_shares(&pools, &Side::Yes, usdc_amount);
-        let probability = Self::calculate_entry_probability(&pools, &Side::Yes, usdc_amount);
+        let shares = Self::calculate_shares(&pools, &Side::Yes, amount);
+        let probability = Self::calculate_entry_probability(&pools, &Side::Yes, amount);
 
-        let usdc = Self::get_usdc_client(&env);
-        usdc.transfer(&user, &env.current_contract_address(), &usdc_amount);
+        let token_client = Self::get_token_client(&env);
+        token_client.transfer(&user, &env.current_contract_address(), &amount);
 
         let mut updated_pools = pools;
-        updated_pools.yes_pool += usdc_amount;
+        updated_pools.yes_pool += amount;
         updated_pools.yes_shares += shares;
         env.storage().persistent().set(&DataKey::MarketPools(market_id), &updated_pools);
         env.storage().persistent().extend_ttl(&DataKey::MarketPools(market_id), 34560, 34560);
 
-        Self::upsert_position(&env, &user, market_id, Side::Yes, usdc_amount, shares, probability);
+        Self::upsert_position(&env, &user, market_id, Side::Yes, amount, shares, probability);
         Self::track_user_market(&env, &user, market_id, Side::Yes);
 
         env.events().publish(
             (symbol_short!("buy_yes"), user, market_id),
-            (usdc_amount, shares),
+            (amount, shares),
         );
 
         shares
     }
 
-    pub fn buy_no(env: Env, user: Address, market_id: u64, usdc_amount: i128) -> i128 {
+    pub fn buy_no(env: Env, user: Address, market_id: u64, amount: i128) -> i128 {
         user.require_auth();
-        Self::validate_amount(usdc_amount);
+        Self::validate_amount(amount);
 
         let pools = Self::get_or_init_pools(&env, market_id);
-        let shares = Self::calculate_shares(&pools, &Side::No, usdc_amount);
-        let probability = Self::calculate_entry_probability(&pools, &Side::No, usdc_amount);
+        let shares = Self::calculate_shares(&pools, &Side::No, amount);
+        let probability = Self::calculate_entry_probability(&pools, &Side::No, amount);
 
-        let usdc = Self::get_usdc_client(&env);
-        usdc.transfer(&user, &env.current_contract_address(), &usdc_amount);
+        let token_client = Self::get_token_client(&env);
+        token_client.transfer(&user, &env.current_contract_address(), &amount);
 
         let mut updated_pools = pools;
-        updated_pools.no_pool += usdc_amount;
+        updated_pools.no_pool += amount;
         updated_pools.no_shares += shares;
         env.storage().persistent().set(&DataKey::MarketPools(market_id), &updated_pools);
         env.storage().persistent().extend_ttl(&DataKey::MarketPools(market_id), 34560, 34560);
 
-        Self::upsert_position(&env, &user, market_id, Side::No, usdc_amount, shares, probability);
+        Self::upsert_position(&env, &user, market_id, Side::No, amount, shares, probability);
         Self::track_user_market(&env, &user, market_id, Side::No);
 
         env.events().publish(
             (symbol_short!("buy_no"), user, market_id),
-            (usdc_amount, shares),
+            (amount, shares),
         );
 
         shares
@@ -228,7 +228,7 @@ impl PositionVault {
         user: &Address,
         market_id: u64,
         side: Side,
-        usdc_amount: i128,
+        amount: i128,
         shares: i128,
         probability: i128,
     ) {
@@ -238,7 +238,7 @@ impl PositionVault {
             .persistent()
             .get::<DataKey, Position>(&key)
             .map(|mut p| {
-                p.amount_usdc += usdc_amount;
+                p.amount += amount;
                 p.shares += shares;
                 p.entry_probability = probability;
                 p.timestamp = env.ledger().timestamp();
@@ -248,7 +248,7 @@ impl PositionVault {
                 user: user.clone(),
                 market_id,
                 side,
-                amount_usdc: usdc_amount,
+                amount,
                 shares,
                 entry_probability: probability,
                 timestamp: env.ledger().timestamp(),
@@ -290,24 +290,24 @@ impl PositionVault {
             })
     }
 
-    fn get_usdc_client(env: &Env) -> token::Client {
-        let usdc: Address = env.storage().instance().get(&DataKey::UsdcToken).unwrap();
-        token::Client::new(env, &usdc)
+    fn get_token_client(env: &Env) -> token::Client {
+        let token_addr: Address = env.storage().instance().get(&DataKey::Token).unwrap();
+        token::Client::new(env, &token_addr)
     }
 
-    /// Simplified LMSR-inspired share formula: lower probability → more shares per dollar.
-    fn calculate_shares(pools: &MarketPools, side: &Side, usdc_amount: i128) -> i128 {
+    /// Simplified LMSR-inspired share formula: lower probability → more shares per unit.
+    fn calculate_shares(pools: &MarketPools, side: &Side, amount: i128) -> i128 {
         let total = pools.yes_pool + pools.no_pool;
         if total == 0 {
-            return usdc_amount; // 1:1 at market open
+            return amount; // 1:1 at market open
         }
         let side_pool = match side {
             Side::Yes => pools.yes_pool,
             Side::No => pools.no_pool,
         };
         let probability = if side_pool == 0 { 50i128 } else { (side_pool * 100) / total };
-        if probability == 0 { return usdc_amount * 100; }
-        (usdc_amount * 100) / probability
+        if probability == 0 { return amount * 100; }
+        (amount * 100) / probability
     }
 
     /// Returns entry probability in percentage (0-100) after the new amount is added.
@@ -322,8 +322,7 @@ impl PositionVault {
 
     fn validate_amount(amount: i128) {
         if amount < 1_000_000 {
-            panic!("minimum trade is 1 USDC");
+            panic!("minimum trade is 1 XLM");
         }
     }
 }
-

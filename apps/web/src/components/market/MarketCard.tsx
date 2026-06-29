@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Clock, Users, TrendingUp, ArrowRight } from 'lucide-react';
 import { Market } from '@/types';
-import { categoryColor, formatUSDC, timeUntil, cn } from '@/lib/utils';
+import { categoryColor, formatXLM, timeUntil, cn } from '@/lib/utils';
 
 interface Props {
   market: Market;
@@ -74,7 +74,7 @@ export function MarketCard({ market, index = 0 }: Props) {
             <div className="flex items-center gap-3">
               <span className="flex items-center gap-1">
                 <TrendingUp className="w-3.5 h-3.5" />
-                {formatUSDC(totalVolume)}
+                {formatXLM(totalVolume)}
               </span>
               <span className="flex items-center gap-1">
                 <Users className="w-3.5 h-3.5" />

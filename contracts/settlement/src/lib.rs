@@ -36,7 +36,7 @@ pub struct VaultPosition {
     pub user: Address,
     pub market_id: u64,
     pub side: VaultSide,
-    pub amount_usdc: i128,
+    pub amount: i128,
     pub shares: i128,
     pub entry_probability: i128,
     pub timestamp: u64,
@@ -135,7 +135,7 @@ pub struct SettlementRecord {
 #[contracttype]
 pub enum DataKey {
     Admin,
-    UsdcToken,
+    Token,
     PositionVault,
     MarketFactory,
     Reputation,
@@ -155,7 +155,7 @@ impl SettlementContract {
     pub fn initialize(
         env: Env,
         admin: Address,
-        usdc_token: Address,
+        token: Address,
         position_vault: Address,
         market_factory: Address,
         reputation: Address,
@@ -166,7 +166,7 @@ impl SettlementContract {
             panic!("already initialized");
         }
         env.storage().instance().set(&DataKey::Admin, &admin);
-        env.storage().instance().set(&DataKey::UsdcToken, &usdc_token);
+        env.storage().instance().set(&DataKey::Token, &token);
         env.storage().instance().set(&DataKey::PositionVault, &position_vault);
         env.storage().instance().set(&DataKey::MarketFactory, &market_factory);
         env.storage().instance().set(&DataKey::Reputation, &reputation);
@@ -270,12 +270,12 @@ impl SettlementContract {
         }
 
         // Transfer winnings
-        let usdc = Self::get_usdc_client(&env);
-        usdc.transfer(&env.current_contract_address(), &user, &net_payout);
+        let token_client = Self::get_token_client(&env);
+        token_client.transfer(&env.current_contract_address(), &user, &net_payout);
 
         if fee_amount > 0 {
             let treasury: Address = env.storage().instance().get(&DataKey::PlatformTreasury).unwrap();
-            usdc.transfer(&env.current_contract_address(), &treasury, &fee_amount);
+            token_client.transfer(&env.current_contract_address(), &treasury, &fee_amount);
         }
 
         // Mark position as claimed in the vault
@@ -287,7 +287,7 @@ impl SettlementContract {
         );
 
         // Update reputation — profit = net_payout minus original bet
-        let profit = net_payout - position.amount_usdc;
+        let profit = net_payout - position.amount;
         let rep_addr: Address = env.storage().instance().get(&DataKey::Reputation).unwrap();
         let rep = ReputationClient::new(&env, rep_addr);
         rep.update_reputation(
@@ -295,7 +295,7 @@ impl SettlementContract {
             &user,
             market_id,
             true,
-            position.amount_usdc,
+            position.amount,
             profit,
         );
 
@@ -342,12 +342,12 @@ impl SettlementContract {
             &user,
             market_id,
             false,
-            position.amount_usdc,
-            -position.amount_usdc, // full loss
+            position.amount,
+            -position.amount, // full loss
         );
     }
 
-    /// Refunds USDC for cancelled markets. Reads deposited amount from vault — never trusts caller.
+    /// Refunds XLM for cancelled markets. Reads deposited amount from vault — never trusts caller.
     pub fn claim_refund(env: Env, user: Address, market_id: u64) -> i128 {
         user.require_auth();
 
@@ -364,11 +364,11 @@ impl SettlementContract {
         // Sum YES + NO deposits to refund the total amount the user put in.
         let yes_amount = vault
             .get_position(market_id, &user, VaultSide::Yes)
-            .map(|p| p.amount_usdc)
+            .map(|p| p.amount)
             .unwrap_or(0i128);
         let no_amount = vault
             .get_position(market_id, &user, VaultSide::No)
-            .map(|p| p.amount_usdc)
+            .map(|p| p.amount)
             .unwrap_or(0i128);
 
         let total_refund = yes_amount + no_amount;
@@ -376,8 +376,8 @@ impl SettlementContract {
             panic!("no deposits to refund");
         }
 
-        let usdc = Self::get_usdc_client(&env);
-        usdc.transfer(&env.current_contract_address(), &user, &total_refund);
+        let token_client = Self::get_token_client(&env);
+        token_client.transfer(&env.current_contract_address(), &user, &total_refund);
 
         env.events().publish(
             (symbol_short!("refunded"), user, market_id),
@@ -414,9 +414,8 @@ impl SettlementContract {
 
     // ─── Internal ─────────────────────────────────────────────────────────────
 
-    fn get_usdc_client(env: &Env) -> token::Client {
-        let usdc: Address = env.storage().instance().get(&DataKey::UsdcToken).unwrap();
-        token::Client::new(env, &usdc)
+    fn get_token_client(env: &Env) -> token::Client {
+        let token_addr: Address = env.storage().instance().get(&DataKey::Token).unwrap();
+        token::Client::new(env, &token_addr)
     }
 }
-

@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { PlatformStats } from '@/types';
-import { formatUSDC } from '@/lib/utils';
+import { formatXLM } from '@/lib/utils';
 
 interface Props {
   stats: PlatformStats;
@@ -12,7 +12,7 @@ export function StatsBar({ stats }: Props) {
   const items = [
     { label: 'Total Markets', value: (stats.totalMarkets ?? 0).toLocaleString() },
     { label: 'Open Markets', value: (stats.openMarkets ?? 0).toLocaleString() },
-    { label: 'Volume Traded', value: formatUSDC(stats.totalVolume ?? 0) },
+    { label: 'Volume Traded', value: formatXLM(stats.totalVolume ?? 0) },
     { label: 'Predictors', value: (stats.totalUsers ?? 0).toLocaleString() },
     { label: 'Total Positions', value: (stats.totalPositions ?? 0).toLocaleString() },
   ];

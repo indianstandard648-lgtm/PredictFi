@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import {
   Contract,
   Networks,
-  SorobanRpc,
+  rpc as SorobanRpc,
   TransactionBuilder,
   Transaction,
   xdr,
@@ -77,7 +77,9 @@ export class StellarService implements OnModuleInit {
 
     const response = await this.rpcServer.sendTransaction(preparedTx);
     if (response.status === 'ERROR') {
-      throw new Error(`Contract invocation failed: ${JSON.stringify(response.errorResult)}`);
+      let detail = 'unknown error';
+      try { detail = response.errorResult?.toXDR('base64') ?? 'no result'; } catch { /* noop */ }
+      throw new Error(`Contract invocation failed: ${detail}`);
     }
 
     return this.waitForTransaction(response.hash);

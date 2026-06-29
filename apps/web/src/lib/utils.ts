@@ -14,6 +14,14 @@ export function formatUSDC(amount: string | number, decimals = 2): string {
   return `$${num.toFixed(decimals)}`;
 }
 
+export function formatXLM(amount: string | number, decimals = 2): string {
+  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
+  if (isNaN(num)) return '0.00 XLM';
+  if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M XLM`;
+  if (num >= 1_000) return `${(num / 1_000).toFixed(1)}K XLM`;
+  return `${num.toFixed(decimals)} XLM`;
+}
+
 export function formatProbability(prob: number): string {
   return `${prob.toFixed(1)}%`;
 }

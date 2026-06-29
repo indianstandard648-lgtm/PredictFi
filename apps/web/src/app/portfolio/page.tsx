@@ -7,7 +7,7 @@ import { CheckCircle, Wallet, ExternalLink, TrendingUp, TrendingDown, Loader2 } 
 import { fetchUserPositions, fetchPortfolioStats, claimReward } from '@/lib/api';
 import { useWalletStore } from '@/stores/walletStore';
 import { Position } from '@/types';
-import { formatUSDC, formatDate, cn } from '@/lib/utils';
+import { formatXLM, formatDate, cn } from '@/lib/utils';
 import {
   buildClaimRewardsTx,
   buildRecordLossTx,
@@ -64,7 +64,7 @@ export default function PortfolioPage() {
       try {
         const result = await claimReward(address, position.id, 'no-onchain-tx');
         if (result.won) {
-          toast.success(`Claimed ${formatUSDC(result.payout)}!`);
+          toast.success(`Claimed ${formatXLM(result.payout)}!`);
         } else {
           toast('Position settled. Better luck next time.', { icon: '📉' });
         }
@@ -114,7 +114,7 @@ export default function PortfolioPage() {
 
       if (result.won) {
         toast.success(
-          `Claimed ${formatUSDC(result.payout)}! Tx: ${txHash.slice(0, 8)}...`,
+          `Claimed ${formatXLM(result.payout)}! Tx: ${txHash.slice(0, 8)}...`,
           { id: loadingToast, duration: 6000 },
         );
       } else {
@@ -157,11 +157,11 @@ export default function PortfolioPage() {
           {[
             { label: 'Total Positions', value: stats.totalPositions },
             { label: 'Active', value: stats.activePositions },
-            { label: 'Invested', value: formatUSDC(stats.totalInvested) },
-            { label: 'Payout', value: formatUSDC(stats.totalPayout) },
+            { label: 'Invested', value: formatXLM(stats.totalInvested) },
+            { label: 'Payout', value: formatXLM(stats.totalPayout) },
             {
               label: 'P&L',
-              value: formatUSDC(Math.abs(stats.totalProfit)),
+              value: formatXLM(Math.abs(stats.totalProfit)),
               color: stats.totalProfit >= 0 ? 'text-primary' : 'text-no',
               prefix: stats.totalProfit >= 0 ? '+' : '-',
             },
@@ -259,7 +259,7 @@ export default function PortfolioPage() {
                   <div className="flex items-center gap-4 text-right">
                     <div>
                       <p className="text-xs text-muted">Invested</p>
-                      <p className="font-mono font-medium">{formatUSDC(position.amountUsdc)}</p>
+                      <p className="font-mono font-medium">{formatXLM(position.amountUsdc)}</p>
                     </div>
 
                     {position.status === 'ACTIVE' && !isSettledWinner && !isSettledLoser && (
@@ -276,7 +276,7 @@ export default function PortfolioPage() {
                           'font-mono font-medium',
                           Number(position.profit ?? 0) > 0 ? 'text-primary' : 'text-no',
                         )}>
-                          {formatUSDC(position.payout)}
+                          {formatXLM(position.payout)}
                         </p>
                       </div>
                     )}

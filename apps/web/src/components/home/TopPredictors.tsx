@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Trophy, TrendingUp } from 'lucide-react';
 import { LeaderboardEntry } from '@/types';
-import { formatAddress, formatUSDC } from '@/lib/utils';
+import { formatAddress, formatXLM } from '@/lib/utils';
 
 interface Props {
   predictors: LeaderboardEntry[];
@@ -67,7 +67,7 @@ export function TopPredictors({ predictors }: Props) {
                     </div>
                     <div className="flex justify-between text-xs">
                       <span className="text-muted">Volume</span>
-                      <span>{formatUSDC(predictor.totalVolume)}</span>
+                      <span>{formatXLM(predictor.totalVolume)}</span>
                     </div>
                     <div className="flex justify-between text-xs">
                       <span className="text-muted">Markets</span>

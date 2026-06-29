@@ -4,7 +4,7 @@ import {
   xdr,
   nativeToScVal,
   scValToNative,
-  SorobanRpc,
+  rpc as SorobanRpc,
   TransactionBuilder,
   BASE_FEE,
 } from '@stellar/stellar-sdk';
@@ -13,6 +13,7 @@ import {
   NETWORK_PASSPHRASE,
   getContractId,
   buildContractTransaction,
+  XLM_CONTRACT_ID,
 } from './stellar';
 
 // ─── Encoding helpers for Soroban contracttype types ─────────────────────────
@@ -49,7 +50,7 @@ export interface CreateMarketContractParams {
   oracle_source: string;   // human-readable source label
   end_date: bigint;        // unix timestamp (seconds)
   resolution_date: bigint; // unix timestamp (seconds)
-  min_bet: bigint;         // 1_000_000 = 0.1 USDC (7-decimal)
+  min_bet: bigint;         // 1_000_000 = 0.1 XLM (7-decimal stroops)
   max_bet: bigint;         // 0 = no limit
   trading_fee_bps: number; // 0 = platform default (200 bps)
 }
@@ -170,28 +171,6 @@ export async function buildRecordLossTx(
   );
 }
 
-/** approve USDC spending with correct absolute expiration ledger */
-export async function buildApproveUsdcTx(
-  userAddress: string,
-  amountUsdc: bigint,
-): Promise<string> {
-  const vaultId = getContractId('positionVault');
-  const latestLedger = await rpcServer.getLatestLedger();
-  const expirationLedger = latestLedger.sequence + 500; // ~40-minute window
-
-  return buildContractTransaction(
-    userAddress,
-    getContractId('usdc'),
-    'approve',
-    [
-      new Address(userAddress).toScVal(),
-      new Address(vaultId).toScVal(),
-      nativeToScVal(amountUsdc, { type: 'i128' }),
-      nativeToScVal(expirationLedger, { type: 'u32' }),
-    ],
-  );
-}
-
 // ─── Simulation-based reads (require a valid wallet address) ─────────────────
 
 async function simulateContractCall(
@@ -306,10 +285,10 @@ export async function readSettlementFromChain(
 // ─── Error extraction ─────────────────────────────────────────────────────────
 
 const CONTRACT_ERROR_MAP: Record<string, string> = {
-  'minimum trade is 1 USDC': 'Minimum trade is 0.1 USDC',
+  'minimum trade is 1 XLM': 'Minimum trade is 1 XLM',
   'end_date must be in the future': 'Trading end date must be in the future',
   'resolution_date must be >= end_date': 'Resolution date must be after end date',
-  'min_bet must be at least 1 USDC': 'Minimum bet must be at least 0.1 USDC',
+  'min_bet must be at least 1 XLM': 'Minimum bet must be at least 1 XLM',
   'market is not open': 'Market is not open for trading',
   'market end_date not reached': 'Market trading period has not ended yet',
   'already resolved': 'Market has already been resolved',
@@ -325,15 +304,57 @@ const CONTRACT_ERROR_MAP: Record<string, string> = {
   'no losing position found': 'You do not have a losing position in this market',
 };
 
+// Soroban token contract error codes (SAC and common custom tokens)
+const SOROBAN_TOKEN_ERRORS: Record<number, string> = {
+  10: 'Insufficient XLM balance — fund your wallet via Stellar Friendbot first',
+  11: 'Insufficient XLM allowance',
+  12: 'Overflow error in token contract',
+  13: 'Insufficient XLM balance — run Friendbot on your wallet address to get testnet XLM',
+};
+
 export function extractContractError(rawError: string): string {
   for (const [pattern, message] of Object.entries(CONTRACT_ERROR_MAP)) {
     if (rawError.includes(pattern)) return message;
   }
+
+  // Soroban HostError format: "HostError: Error(Contract, #N)" or "Error(Contract, #N)"
+  const contractErrMatch = rawError.match(/Error\(Contract,\s*#(\d+)\)/);
+  if (contractErrMatch) {
+    const code = parseInt(contractErrMatch[1], 10);
+    return SOROBAN_TOKEN_ERRORS[code] ?? `Contract error #${code} — check your XLM balance`;
+  }
+
+  // Soroban value/wasm errors
+  if (rawError.includes('Error(Value,') || rawError.includes('Error(WasmVm,')) {
+    return 'Contract execution error — the transaction arguments may be invalid';
+  }
+
+  if (rawError.includes('HostError')) {
+    // Show only the first line of the HostError (skip the event log dump)
+    const firstLine = rawError.split('\n')[0].replace(/^.*HostError:\s*/, '');
+    return `Transaction failed: ${firstLine.slice(0, 120)}`;
+  }
+
   if (rawError.includes('Transaction failed')) return 'Transaction was rejected by the network';
   if (rawError.includes('Transaction timeout')) return 'Transaction timed out — please try again';
-  if (rawError.includes('insufficient')) return 'Insufficient USDC balance';
+  if (rawError.includes('insufficient')) return 'Insufficient XLM balance';
   if (rawError.includes('User rejected') || rawError.includes('rejected')) return 'Transaction rejected by wallet';
+  if (rawError.includes('Bad union switch')) return 'Stellar SDK version mismatch — please refresh the page';
   return rawError.length > 120 ? `Transaction failed: ${rawError.slice(0, 120)}...` : rawError;
+}
+
+export async function readXlmBalance(userAddress: string): Promise<number> {
+  try {
+    const result = await simulateContractCall(
+      userAddress,
+      XLM_CONTRACT_ID,
+      'balance',
+      [new Address(userAddress).toScVal()],
+    ) as bigint;
+    return Number(result ?? 0n) / 10_000_000;
+  } catch {
+    return 0;
+  }
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -342,10 +363,10 @@ export function dateToStellarTimestamp(isoDate: string): bigint {
   return BigInt(Math.floor(new Date(isoDate).getTime() / 1000));
 }
 
-export function usdcToStroops(usdc: number): bigint {
-  return BigInt(Math.floor(usdc * 10_000_000));
+export function xlmToStroops(xlm: number): bigint {
+  return BigInt(Math.floor(xlm * 10_000_000));
 }
 
-export function stroopsToUsdc(stroops: bigint): number {
+export function stroopsToXlm(stroops: bigint): number {
   return Number(stroops) / 10_000_000;
 }

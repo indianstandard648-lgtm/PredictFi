@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Trophy, TrendingUp, BarChart3, Star, Flame } from 'lucide-react';
 import { fetchLeaderboard } from '@/lib/api';
 import { LeaderboardEntry } from '@/types';
-import { formatAddress, formatUSDC, cn } from '@/lib/utils';
+import { formatAddress, formatXLM, cn } from '@/lib/utils';
 
 type Category = 'frs' | 'accuracy' | 'volume' | 'profit';
 
@@ -167,7 +167,7 @@ export default function LeaderboardPage() {
                     {entry.totalPredictions}
                   </td>
                   <td className="px-5 py-4 text-right hidden lg:table-cell font-mono text-sm">
-                    {formatUSDC(entry.totalVolume)}
+                    {formatXLM(entry.totalVolume)}
                   </td>
                   <td className="px-5 py-4 text-right hidden lg:table-cell">
                     {entry.streak > 0 && (

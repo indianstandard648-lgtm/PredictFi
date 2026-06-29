@@ -1,19 +1,20 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { fetchProfile, fetchReputation } from '@/lib/api';
-import { formatAddress, formatUSDC, formatDate, cn } from '@/lib/utils';
+import { formatAddress, formatXLM, formatDate, cn } from '@/lib/utils';
 import { Trophy, Target, TrendingUp, Flame, Calendar, BarChart2 } from 'lucide-react';
 
 interface Props {
-  params: { address: string };
+  params: Promise<{ address: string }>;
 }
 
 export const revalidate = 60;
 
 export default async function ProfilePage({ params }: Props) {
+  const { address } = await params;
   const [profile, reputation] = await Promise.all([
-    fetchProfile(params.address).catch(() => null),
-    fetchReputation(params.address).catch(() => null),
+    fetchProfile(address).catch(() => null),
+    fetchReputation(address).catch(() => null),
   ]);
 
   if (!profile) return notFound();
@@ -28,14 +29,14 @@ export default async function ProfilePage({ params }: Props) {
       <div className="card-base p-8 mb-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
           <div className="w-20 h-20 rounded-2xl bg-primary/20 flex items-center justify-center text-3xl font-bold text-primary">
-            {(profile.username ?? params.address).slice(0, 2).toUpperCase()}
+            {(profile.username ?? address).slice(0, 2).toUpperCase()}
           </div>
 
           <div className="flex-1">
             <h1 className="text-2xl font-bold">
-              {profile.username ?? formatAddress(params.address, 6)}
+              {profile.username ?? formatAddress(address, 6)}
             </h1>
-            <p className="font-mono text-muted text-sm mt-1">{params.address}</p>
+            <p className="font-mono text-muted text-sm mt-1">{address}</p>
             {profile.bio && (
               <p className="text-sm text-muted mt-2 max-w-lg">{profile.bio}</p>
             )}
@@ -67,7 +68,7 @@ export default async function ProfilePage({ params }: Props) {
             { label: 'Correct', value: rep.correctPredictions, icon: Target },
             { label: 'Win Rate', value: `${winRate.toFixed(1)}%`, icon: Trophy, color: 'text-primary' },
             { label: 'Accuracy', value: `${accuracy.toFixed(1)}%`, icon: Target, color: 'text-primary' },
-            { label: 'Volume', value: formatUSDC(rep.totalVolume), icon: TrendingUp },
+            { label: 'Volume', value: formatXLM(rep.totalVolume), icon: TrendingUp },
             { label: 'Streak', value: `${rep.streak}🔥`, icon: Flame, color: rep.streak > 0 ? 'text-warning' : '' },
           ].map(({ label, value, icon: Icon, color }) => (
             <div key={label} className="stat-card">
@@ -133,11 +134,11 @@ export default async function ProfilePage({ params }: Props) {
                   <span className={position.side === 'YES' ? 'text-primary' : 'text-no'}>
                     {position.side}
                   </span>
-                  <span className="text-muted">{formatUSDC(position.amountUsdc)}</span>
+                  <span className="text-muted">{formatXLM(position.amountUsdc)}</span>
                   {position.profit !== null && position.profit !== undefined && (
                     <span className={parseFloat(position.profit) >= 0 ? 'text-primary' : 'text-no'}>
                       {parseFloat(position.profit) >= 0 ? '+' : ''}
-                      {formatUSDC(position.profit)}
+                      {formatXLM(position.profit)}
                     </span>
                   )}
                 </div>

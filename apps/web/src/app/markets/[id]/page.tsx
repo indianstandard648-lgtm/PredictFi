@@ -1,21 +1,22 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, use } from 'react';
 import { notFound } from 'next/navigation';
 import { fetchMarket } from '@/lib/api';
 import { MarketChart } from '@/components/market/MarketChart';
 import { TradingPanel } from '@/components/market/TradingPanel';
 import { ProbabilityBar } from '@/components/market/ProbabilityBar';
 import { ResolvePanel } from '@/components/market/ResolvePanel';
-import { categoryColor, formatUSDC, formatDateTime, timeUntil, cn } from '@/lib/utils';
+import { categoryColor, formatXLM, formatDateTime, timeUntil, cn } from '@/lib/utils';
 import { Clock, Users, TrendingUp, CheckCircle, XCircle, Lock, ExternalLink, RefreshCw } from 'lucide-react';
 import { Market } from '@/types';
 
 interface Props {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 export default function MarketDetailPage({ params }: Props) {
+  const { id } = use(params);
   const [market, setMarket] = useState<Market | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -24,7 +25,7 @@ export default function MarketDetailPage({ params }: Props) {
     if (!quiet) setIsLoading(true);
     else setRefreshing(true);
     try {
-      const m = await fetchMarket(params.id);
+      const m = await fetchMarket(id);
       setMarket(m);
     } catch {
       setMarket(null);
@@ -32,7 +33,7 @@ export default function MarketDetailPage({ params }: Props) {
       setIsLoading(false);
       setRefreshing(false);
     }
-  }, [params.id]);
+  }, [id]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -101,7 +102,7 @@ export default function MarketDetailPage({ params }: Props) {
             <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-border">
               <div>
                 <p className="text-xs text-muted mb-1">Volume</p>
-                <p className="font-bold font-mono">{formatUSDC(market.totalVolume)}</p>
+                <p className="font-bold font-mono">{formatXLM(market.totalVolume)}</p>
               </div>
               <div>
                 <p className="text-xs text-muted mb-1">Traders</p>
@@ -125,13 +126,13 @@ export default function MarketDetailPage({ params }: Props) {
               <div className="bg-primary/5 border border-primary/20 rounded-xl p-4">
                 <p className="text-xs text-muted mb-1">YES Pool</p>
                 <p className="text-xl font-bold text-primary font-mono">
-                  {formatUSDC(market.yesPool)}
+                  {formatXLM(market.yesPool)}
                 </p>
               </div>
               <div className="bg-no/5 border border-no/20 rounded-xl p-4">
                 <p className="text-xs text-muted mb-1">NO Pool</p>
                 <p className="text-xl font-bold text-no font-mono">
-                  {formatUSDC(market.noPool)}
+                  {formatXLM(market.noPool)}
                 </p>
               </div>
             </div>

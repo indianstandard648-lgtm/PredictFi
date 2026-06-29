@@ -5,9 +5,10 @@ import {
   allowAllModules,
 } from '@creit.tech/stellar-wallets-kit';
 import {
+  Asset,
   Contract,
   Networks,
-  SorobanRpc,
+  rpc as SorobanRpc,
   TransactionBuilder,
   Transaction,
   xdr,
@@ -24,6 +25,9 @@ export const NETWORK_PASSPHRASE =
   NETWORK === 'mainnet' ? Networks.PUBLIC : Networks.TESTNET;
 
 export const rpcServer = new SorobanRpc.Server(RPC_URL);
+
+// Native XLM SAC contract ID (derived from network passphrase — no env var needed)
+export const XLM_CONTRACT_ID = Asset.native().contractId(NETWORK_PASSPHRASE);
 
 // ─── Wallet Kit ───────────────────────────────────────────────────────────────
 
@@ -75,7 +79,6 @@ const CONTRACT_IDS = {
   positionVault: process.env.NEXT_PUBLIC_POSITION_VAULT_CONTRACT ?? '',
   settlement: process.env.NEXT_PUBLIC_SETTLEMENT_CONTRACT ?? '',
   reputation: process.env.NEXT_PUBLIC_REPUTATION_CONTRACT ?? '',
-  usdc: process.env.NEXT_PUBLIC_USDC_CONTRACT ?? '',
 };
 
 export function getContractId(name: keyof typeof CONTRACT_IDS): string {
@@ -108,27 +111,31 @@ export async function submitSignedTransaction(signedXdr: string): Promise<string
   const result = await rpcServer.sendTransaction(tx);
 
   if (result.status === 'ERROR') {
-    throw new Error(`Transaction error: ${JSON.stringify(result.errorResult)}`);
+    let detail = 'unknown error';
+    try { detail = result.errorResult?.toXDR('base64') ?? 'no result'; } catch { /* noop */ }
+    throw new Error(`Transaction error: ${detail}`);
   }
 
   return result.hash;
 }
 
 export async function waitForTransaction(txHash: string): Promise<unknown> {
-  let attempts = 0;
-  while (attempts < 15) {
-    await new Promise((r) => setTimeout(r, 2000));
-    const result = await rpcServer.getTransaction(txHash);
+  const result = await rpcServer.pollTransaction(txHash, { attempts: 20 });
 
-    if (result.status === SorobanRpc.Api.GetTransactionStatus.SUCCESS) {
-      return result.returnValue ? scValToNative(result.returnValue) : null;
-    }
-    if (result.status === SorobanRpc.Api.GetTransactionStatus.FAILED) {
-      throw new Error(`Transaction failed: ${txHash}`);
-    }
-    attempts++;
+  if (result.status === SorobanRpc.Api.GetTransactionStatus.SUCCESS) {
+    return result.returnValue ? scValToNative(result.returnValue) : null;
   }
-  throw new Error('Transaction timeout');
+
+  // Extract readable error from resultXdr if available
+  let detail = txHash;
+  try {
+    const xdrResult = (result as any).resultXdr;
+    if (xdrResult && typeof xdrResult.toXDR === 'function') {
+      detail = xdrResult.toXDR('base64');
+    }
+  } catch { /* noop */ }
+
+  throw new Error(`Transaction failed: ${detail}`);
 }
 
 // ─── Market Contract Helpers ──────────────────────────────────────────────────
@@ -136,7 +143,7 @@ export async function waitForTransaction(txHash: string): Promise<unknown> {
 export async function buildBuyYesTx(
   userAddress: string,
   marketId: number,
-  usdcAmount: bigint,
+  amount: bigint,
 ): Promise<string> {
   return buildContractTransaction(
     userAddress,
@@ -145,7 +152,7 @@ export async function buildBuyYesTx(
     [
       new Address(userAddress).toScVal(),
       nativeToScVal(marketId, { type: 'u64' }),
-      nativeToScVal(usdcAmount, { type: 'i128' }),
+      nativeToScVal(amount, { type: 'i128' }),
     ],
   );
 }
@@ -153,7 +160,7 @@ export async function buildBuyYesTx(
 export async function buildBuyNoTx(
   userAddress: string,
   marketId: number,
-  usdcAmount: bigint,
+  amount: bigint,
 ): Promise<string> {
   return buildContractTransaction(
     userAddress,
@@ -162,33 +169,15 @@ export async function buildBuyNoTx(
     [
       new Address(userAddress).toScVal(),
       nativeToScVal(marketId, { type: 'u64' }),
-      nativeToScVal(usdcAmount, { type: 'i128' }),
+      nativeToScVal(amount, { type: 'i128' }),
     ],
   );
 }
 
-export async function buildApproveUsdcTx(
-  userAddress: string,
-  amountUsdc: bigint,
-): Promise<string> {
-  const vaultId = CONTRACT_IDS.positionVault;
-  return buildContractTransaction(
-    userAddress,
-    CONTRACT_IDS.usdc,
-    'approve',
-    [
-      new Address(userAddress).toScVal(),
-      new Address(vaultId).toScVal(),
-      nativeToScVal(amountUsdc, { type: 'i128' }),
-      nativeToScVal(200, { type: 'u32' }),
-    ],
-  );
+export function xlmToStroop(xlm: number): bigint {
+  return BigInt(Math.floor(xlm * 10_000_000));
 }
 
-export function usdcToStroop(usdc: number): bigint {
-  return BigInt(Math.floor(usdc * 10_000_000));
-}
-
-export function stroopToUsdc(stroops: bigint): number {
+export function stroopToXlm(stroops: bigint): number {
   return Number(stroops) / 10_000_000;
 }
