@@ -44,6 +44,11 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api/docs', app, document);
 
+  // Health check — used by Docker, Railway, Render, load balancers
+  app.getHttpAdapter().get('/api/v1/health', (_req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  });
+
   const port = config.get<number>('API_PORT', 4000);
   await app.listen(port);
   console.log(`\n🚀 PredictFi API running on http://localhost:${port}`);

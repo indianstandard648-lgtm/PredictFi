@@ -19,12 +19,26 @@ import {
 } from '@stellar/stellar-sdk';
 
 const NETWORK = (process.env.NEXT_PUBLIC_STELLAR_NETWORK ?? 'testnet') as 'testnet' | 'mainnet';
-const RPC_URL = 'https://soroban-testnet.stellar.org';
+
+const RPC_URL =
+  process.env.NEXT_PUBLIC_STELLAR_RPC_URL ??
+  (NETWORK === 'mainnet'
+    ? 'https://soroban-mainnet.stellar.org'
+    : 'https://soroban-testnet.stellar.org');
 
 export const NETWORK_PASSPHRASE =
   NETWORK === 'mainnet' ? Networks.PUBLIC : Networks.TESTNET;
 
 export const rpcServer = new SorobanRpc.Server(RPC_URL);
+
+// Explorer base URL — switches automatically with network
+const EXPLORER_NET = NETWORK === 'mainnet' ? 'public' : 'testnet';
+export function stellarExplorerUrl(
+  type: 'tx' | 'account' | 'contract',
+  id: string,
+): string {
+  return `https://stellar.expert/explorer/${EXPLORER_NET}/${type}/${id}`;
+}
 
 // Native XLM SAC contract ID (derived from network passphrase — no env var needed)
 export const XLM_CONTRACT_ID = Asset.native().contractId(NETWORK_PASSPHRASE);

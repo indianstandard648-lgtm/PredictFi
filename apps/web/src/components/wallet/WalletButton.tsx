@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Wallet, ChevronDown, Copy, LogOut, User, ExternalLink } from 'lucide-react';
 import { useWalletStore } from '@/stores/walletStore';
-import { connectWallet, disconnectWallet } from '@/lib/stellar';
+import { connectWallet, disconnectWallet, stellarExplorerUrl } from '@/lib/stellar';
 import { formatAddress } from '@/lib/utils';
 import { authUser } from '@/lib/api';
 import toast from 'react-hot-toast';
@@ -101,7 +101,7 @@ export function WalletButton() {
                 Copy Address
               </button>
               <a
-                href={`https://stellar.expert/explorer/testnet/account/${address}`}
+                href={stellarExplorerUrl('account', address)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-accent text-sm transition-colors"

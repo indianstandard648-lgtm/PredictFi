@@ -1,21 +1,33 @@
+# Build stage — install deps and compile TypeScript
 FROM node:20-alpine AS builder
-
 WORKDIR /app
-COPY package*.json ./
-COPY prisma ./prisma/
-RUN npm install
-COPY . .
+COPY apps/api/package*.json ./
+RUN npm ci --only=production && cp -r node_modules prod_node_modules
+RUN npm ci
+COPY apps/api/prisma ./prisma/
 RUN npx prisma generate
+COPY apps/api/ .
 RUN npm run build
 
+# Runtime stage — lean image
 FROM node:20-alpine AS runner
-
 WORKDIR /app
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/prisma ./prisma
-COPY package*.json ./
 
+# Run as non-root
+RUN addgroup -S predictfi && adduser -S predictfi -G predictfi
+
+COPY --from=builder /app/prod_node_modules ./node_modules
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/prisma ./prisma
+COPY apps/api/package*.json ./
+
+# Re-generate Prisma client in runtime image (ensures correct platform binaries)
+RUN npx prisma generate
+
+USER predictfi
 EXPOSE 4000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD wget -qO- http://localhost:4000/api/v1/health || exit 1
 
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]

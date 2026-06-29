@@ -10,7 +10,7 @@ import {
   readMarketOnChain,
   readFactoryAdmin,
 } from '@/lib/contracts';
-import { signTransaction, submitSignedTransaction, waitForTransaction } from '@/lib/stellar';
+import { signTransaction, submitSignedTransaction, waitForTransaction, stellarExplorerUrl } from '@/lib/stellar';
 import { resolveMarket } from '@/lib/api';
 import toast from 'react-hot-toast';
 import { Market } from '@/types';
@@ -146,7 +146,7 @@ export function ResolvePanel({ market, onResolved }: Props) {
           Settlement is processing.
         </p>
         <a
-          href={`https://stellar.expert/explorer/testnet/tx/${txHash}`}
+          href={stellarExplorerUrl('tx', txHash)}
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center gap-1.5 text-primary text-sm hover:underline"

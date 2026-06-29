@@ -10,7 +10,7 @@ import {
   dateToStellarTimestamp,
   extractContractError,
 } from '@/lib/contracts';
-import { signTransaction, submitSignedTransaction, waitForTransaction } from '@/lib/stellar';
+import { signTransaction, submitSignedTransaction, waitForTransaction, stellarExplorerUrl } from '@/lib/stellar';
 import { createMarket } from '@/lib/api';
 import toast from 'react-hot-toast';
 
@@ -172,7 +172,7 @@ export default function CreateMarketPage() {
         </p>
         <p className="text-muted text-sm mb-6">Redirecting to your market...</p>
         <a
-          href={`https://stellar.expert/explorer/testnet/tx/${result.txHash}`}
+          href={stellarExplorerUrl('tx', result.txHash)}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1.5 text-primary text-sm hover:underline"

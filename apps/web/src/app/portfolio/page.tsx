@@ -13,7 +13,7 @@ import {
   buildRecordLossTx,
   extractContractError,
 } from '@/lib/contracts';
-import { signTransaction, submitSignedTransaction, waitForTransaction } from '@/lib/stellar';
+import { signTransaction, submitSignedTransaction, waitForTransaction, stellarExplorerUrl } from '@/lib/stellar';
 import toast from 'react-hot-toast';
 
 interface PortfolioStats {
@@ -244,7 +244,7 @@ export default function PortfolioPage() {
                         <>
                           <span>•</span>
                           <a
-                            href={`https://stellar.expert/explorer/testnet/tx/${position.txHash}`}
+                            href={stellarExplorerUrl('tx', position.txHash)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="flex items-center gap-1 hover:text-primary transition-colors"
@@ -323,7 +323,7 @@ export default function PortfolioPage() {
                         Claimed
                         {position.claimTxHash && (
                           <a
-                            href={`https://stellar.expert/explorer/testnet/tx/${position.claimTxHash}`}
+                            href={stellarExplorerUrl('tx', position.claimTxHash)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="ml-1 opacity-70 hover:opacity-100"

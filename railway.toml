@@ -1,0 +1,13 @@
+# Railway config for the PredictFi API service
+# In Railway dashboard: set "Root Directory" to blank (repo root)
+# and "Dockerfile Path" to deployment/Dockerfile.api
+
+[build]
+builder = "dockerfile"
+dockerfilePath = "deployment/Dockerfile.api"
+
+[deploy]
+healthcheckPath = "/api/v1/health"
+healthcheckTimeout = 60
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
