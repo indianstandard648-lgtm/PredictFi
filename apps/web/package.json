@@ -27,7 +27,7 @@
     "framer-motion": "^11.3.0",
     "legacy": "^0.0.3",
     "lucide-react": "^0.400.0",
-    "next": "15.2.0",
+    "next": "15.3.9",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-hot-toast": "^2.4.1",
