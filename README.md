@@ -4,7 +4,8 @@ A production-grade prediction market protocol built on the Stellar blockchain us
 
 **Live Demo:** [https://web-six-topaz-82.vercel.app](https://web-six-topaz-82.vercel.app)  
 **API:** [https://predictfi-api-production.up.railway.app/api/v1/health](https://predictfi-api-production.up.railway.app/api/v1/health)  
-**API Docs:** [https://predictfi-api-production.up.railway.app/api/docs](https://predictfi-api-production.up.railway.app/api/docs)
+**API Docs:** [https://predictfi-api-production.up.railway.app/api/docs](https://predictfi-api-production.up.railway.app/api/docs)  
+**Demo Video:** [https://youtu.be/d0EmUSgpJ6s?si=Tb0gx7BaSTow293n](https://youtu.be/d0EmUSgpJ6s?si=Tb0gx7BaSTow293n)
 
 ---
 
